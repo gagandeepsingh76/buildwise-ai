@@ -1,0 +1,81 @@
+insert into public.authorities (
+  slug, name, short_name, city, state, country, aliases, jurisdiction_notes,
+  official_website, permit_portal, forms_url, bylaws_url, contact, tags
+) values
+('kda-kanpur', 'Kanpur Development Authority', 'KDA', 'Kanpur', 'Uttar Pradesh', 'India',
+ array['kanpur', 'kda', 'kanpur development authority'],
+ 'Use for properties inside the Kanpur Development Authority planning area. Verify ward, scheme, and plot status with the authority before final decisions.',
+ 'https://www.kdaindia.co.in/', 'https://erpkda.in/', 'https://www.kdaindia.co.in/', 'https://www.kdaindia.co.in/',
+ '{"email":"kda@kdaindia.co.in","phone":"","address":"Kanpur Development Authority, Kanpur, Uttar Pradesh"}'::jsonb,
+ array['development-authority', 'uttar-pradesh', 'building-plan', 'residential', 'commercial']),
+('lda-lucknow', 'Lucknow Development Authority', 'LDA', 'Lucknow', 'Uttar Pradesh', 'India',
+ array['lucknow', 'lda', 'lucknow development authority'],
+ 'Use for properties inside the Lucknow Development Authority planning area. Some services may route through UP online building plan approval systems.',
+ 'https://www.ldalucknow.in/', 'https://map.up.gov.in/', 'https://www.ldalucknow.in/downloads-order/', 'https://www.ldalucknow.in/downloads-order/',
+ '{"email":"","phone":"","address":"Lucknow Development Authority, Lucknow, Uttar Pradesh"}'::jsonb,
+ array['development-authority', 'uttar-pradesh', 'building-plan', 'master-plan']),
+('dda-delhi', 'Delhi Development Authority / Municipal Corporation of Delhi', 'DDA/MCD', 'Delhi', 'Delhi', 'India',
+ array['delhi', 'dda', 'mcd', 'municipal corporation of delhi', 'delhi development authority', 'new delhi'],
+ 'Delhi questions often involve DDA planning rules and MCD sanctioning/municipal processes. Retrieval is filtered to Delhi-specific documents when Delhi is detected.',
+ 'https://dda.gov.in/', 'https://eodb.mcd.gov.in/', 'https://dda.gov.in/building-laws', 'https://dda.gov.in/building-laws',
+ '{"email":"","phone":"","address":"Delhi Development Authority, New Delhi"}'::jsonb,
+ array['development-authority', 'municipal-corporation', 'ubbl', 'building-bye-laws']),
+('bbmp-bengaluru', 'Greater Bengaluru Authority / BBMP with BDA context', 'BBMP/BDA', 'Bengaluru', 'Karnataka', 'India',
+ array['bengaluru', 'bangalore', 'bbmp', 'bda', 'greater bengaluru authority', 'bruhat bengaluru'],
+ 'Use for Bengaluru municipal building approval questions. BDA, BMRDA, and other planning authorities may apply depending on the property location.',
+ 'https://bbmp.gov.in/', 'https://bpas.bbmpgov.in/', 'https://bbmp.gov.in/', 'https://bbmp.gov.in/',
+ '{"email":"comm@bbmp.gov.in","phone":"","address":"Greater Bengaluru Authority / BBMP, Bengaluru, Karnataka"}'::jsonb,
+ array['municipal-corporation', 'karnataka', 'bpas', 'building-plan']),
+('bmc-mumbai', 'Brihanmumbai Municipal Corporation', 'BMC/MCGM', 'Mumbai', 'Maharashtra', 'India',
+ array['mumbai', 'bmc', 'mcgm', 'brihanmumbai', 'municipal corporation of greater mumbai'],
+ 'Use for properties under BMC/MCGM. Development permission and building proposal workflows are handled through official BMC systems and licensed professionals.',
+ 'https://www.mcgm.gov.in/', 'https://www.mcgm.gov.in/irj/portal/anonymous/qlcedeveplan', 'https://www.mcgm.gov.in/', 'https://www.mcgm.gov.in/',
+ '{"email":"","phone":"","address":"Brihanmumbai Municipal Corporation, Mumbai, Maharashtra"}'::jsonb,
+ array['municipal-corporation', 'maharashtra', 'building-proposal', 'development-control']),
+('gda-ghaziabad', 'Ghaziabad Development Authority', 'GDA', 'Ghaziabad', 'Uttar Pradesh', 'India',
+ array['ghaziabad', 'gda', 'ghaziabad development authority'],
+ 'Use for Ghaziabad Development Authority planning area questions. Verify whether the property falls under GDA, municipal, or industrial authority jurisdiction.',
+ 'https://gdaghaziabad.in/', 'https://gdaghaziabad.in/', 'https://gdaghaziabad.in/', 'https://gdaghaziabad.in/',
+ '{"email":"","phone":"","address":"Ghaziabad Development Authority, Ghaziabad, Uttar Pradesh"}'::jsonb,
+ array['development-authority', 'uttar-pradesh', 'building-plan', 'layout']),
+('noida-authority', 'New Okhla Industrial Development Authority', 'NOIDA Authority', 'Noida', 'Uttar Pradesh', 'India',
+ array['noida', 'new okhla', 'noida authority', 'new okhla industrial development authority'],
+ 'Use for Noida Authority sectors and notified areas. Nearby Greater Noida, YEIDA, or municipal jurisdictions require separate verification.',
+ 'https://noidaauthorityonline.in/', 'https://buildingcell.noidaauthorityonline.com/', 'https://noidaauthorityonline.in/', 'https://noidaauthorityonline.in/',
+ '{"email":"","phone":"","address":"NOIDA Authority, Sector 6, Noida, Uttar Pradesh"}'::jsonb,
+ array['industrial-development-authority', 'uttar-pradesh', 'building-cell', 'obpas'])
+on conflict (slug) do update set
+  name = excluded.name,
+  short_name = excluded.short_name,
+  city = excluded.city,
+  state = excluded.state,
+  aliases = excluded.aliases,
+  jurisdiction_notes = excluded.jurisdiction_notes,
+  official_website = excluded.official_website,
+  permit_portal = excluded.permit_portal,
+  forms_url = excluded.forms_url,
+  bylaws_url = excluded.bylaws_url,
+  contact = excluded.contact,
+  tags = excluded.tags,
+  updated_at = now();
+
+insert into public.documents (
+  authority_id, title, document_type, city, state, country, issuing_department,
+  official_url, status, tags, metadata
+)
+select id,
+  short_name || ' official document intake reference',
+  'official-link-reference',
+  city,
+  state,
+  country,
+  name,
+  coalesce(bylaws_url, official_website),
+  'external_reference',
+  array['seed', 'official-link', 'upload-required'],
+  jsonb_build_object(
+    'seed_notice',
+    'This record stores official authority links only. Upload and index the actual official PDFs before relying on document-specific rules.'
+  )
+from public.authorities
+on conflict do nothing;

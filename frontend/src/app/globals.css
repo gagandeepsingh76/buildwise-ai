@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f6f2;
+  --foreground: #17201f;
+  --muted: #64706e;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-strong: rgba(255, 255, 255, 0.94);
+  --border: rgba(20, 31, 30, 0.12);
+}
+
+.dark {
+  --background: #07100f;
+  --foreground: #f4f7f2;
+  --muted: #9ca8a5;
+  --panel: rgba(7, 16, 15, 0.72);
+  --panel-strong: rgba(8, 20, 18, 0.9);
+  --border: rgba(255, 255, 255, 0.12);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+  letter-spacing: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(247, 246, 242, 0.94), rgba(239, 246, 241, 0.9) 42%, rgba(247, 246, 242, 1)),
+    var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.dark body {
+  background:
+    linear-gradient(180deg, rgba(7, 16, 15, 0.98), rgba(10, 32, 30, 0.93) 42%, rgba(7, 16, 15, 1)),
+    var(--background);
+}
+
+::selection {
+  background: rgba(20, 184, 166, 0.28);
+}
+
+.hero-visual {
+  background-image:
+    linear-gradient(90deg, rgba(7, 16, 15, 0.93) 0%, rgba(7, 16, 15, 0.78) 38%, rgba(7, 16, 15, 0.22) 100%),
+    url("/assets/buildwise-hero.png");
+  background-size: cover;
+  background-position: center;
+}
+
+.mesh-band {
+  background:
+    linear-gradient(135deg, rgba(20, 184, 166, 0.14), transparent 34%),
+    linear-gradient(225deg, rgba(245, 158, 11, 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.4));
+}
+
+.dark .mesh-band {
+  background:
+    linear-gradient(135deg, rgba(20, 184, 166, 0.18), transparent 34%),
+    linear-gradient(225deg, rgba(245, 158, 11, 0.13), transparent 36%),
+    linear-gradient(180deg, rgba(8, 20, 18, 0.72), rgba(7, 16, 15, 0.86));
+}
+
+.glass-panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: 0 24px 80px rgba(7, 16, 15, 0.12);
+  backdrop-filter: blur(22px);
+}
+
+.dark .glass-panel {
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(20, 184, 166, 0.45) transparent;
+}

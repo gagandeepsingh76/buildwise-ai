@@ -1,0 +1,142 @@
+[
+  {
+    "id": "kda-kanpur",
+    "name": "Kanpur Development Authority",
+    "short_name": "KDA",
+    "city": "Kanpur",
+    "state": "Uttar Pradesh",
+    "country": "India",
+    "aliases": ["kanpur", "kda", "kanpur development authority"],
+    "jurisdiction_notes": "Use for properties inside the Kanpur Development Authority planning area. Verify ward, scheme, and plot status with the authority before final decisions.",
+    "official_website": "https://www.kdaindia.co.in/",
+    "permit_portal": "https://erpkda.in/",
+    "forms_url": "https://www.kdaindia.co.in/",
+    "bylaws_url": "https://www.kdaindia.co.in/",
+    "contact": {
+      "email": "kda@kdaindia.co.in",
+      "phone": "",
+      "address": "Kanpur Development Authority, Kanpur, Uttar Pradesh"
+    },
+    "tags": ["development-authority", "uttar-pradesh", "building-plan", "residential", "commercial"]
+  },
+  {
+    "id": "lda-lucknow",
+    "name": "Lucknow Development Authority",
+    "short_name": "LDA",
+    "city": "Lucknow",
+    "state": "Uttar Pradesh",
+    "country": "India",
+    "aliases": ["lucknow", "lda", "lucknow development authority"],
+    "jurisdiction_notes": "Use for properties inside the Lucknow Development Authority planning area. Some services may route through UP online building plan approval systems.",
+    "official_website": "https://www.ldalucknow.in/",
+    "permit_portal": "https://map.up.gov.in/",
+    "forms_url": "https://www.ldalucknow.in/downloads-order/",
+    "bylaws_url": "https://www.ldalucknow.in/downloads-order/",
+    "contact": {
+      "email": "",
+      "phone": "",
+      "address": "Lucknow Development Authority, Lucknow, Uttar Pradesh"
+    },
+    "tags": ["development-authority", "uttar-pradesh", "building-plan", "master-plan"]
+  },
+  {
+    "id": "dda-delhi",
+    "name": "Delhi Development Authority / Municipal Corporation of Delhi",
+    "short_name": "DDA/MCD",
+    "city": "Delhi",
+    "state": "Delhi",
+    "country": "India",
+    "aliases": ["delhi", "dda", "mcd", "municipal corporation of delhi", "delhi development authority", "new delhi"],
+    "jurisdiction_notes": "Delhi questions often involve DDA planning rules and MCD sanctioning/municipal processes. Retrieval is filtered to Delhi-specific documents when Delhi is detected.",
+    "official_website": "https://dda.gov.in/",
+    "permit_portal": "https://eodb.mcd.gov.in/",
+    "forms_url": "https://dda.gov.in/building-laws",
+    "bylaws_url": "https://dda.gov.in/building-laws",
+    "contact": {
+      "email": "",
+      "phone": "",
+      "address": "Delhi Development Authority, New Delhi"
+    },
+    "tags": ["development-authority", "municipal-corporation", "ubbl", "building-bye-laws"]
+  },
+  {
+    "id": "bbmp-bengaluru",
+    "name": "Greater Bengaluru Authority / BBMP with BDA context",
+    "short_name": "BBMP/BDA",
+    "city": "Bengaluru",
+    "state": "Karnataka",
+    "country": "India",
+    "aliases": ["bengaluru", "bangalore", "bbmp", "bda", "greater bengaluru authority", "bru hat bengaluru", "bruhat bengaluru"],
+    "jurisdiction_notes": "Use for Bengaluru municipal building approval questions. BDA, BMRDA, and other planning authorities may apply depending on the property location.",
+    "official_website": "https://bbmp.gov.in/",
+    "permit_portal": "https://bpas.bbmpgov.in/",
+    "forms_url": "https://bbmp.gov.in/",
+    "bylaws_url": "https://bbmp.gov.in/",
+    "contact": {
+      "email": "comm@bbmp.gov.in",
+      "phone": "",
+      "address": "Greater Bengaluru Authority / BBMP, Bengaluru, Karnataka"
+    },
+    "tags": ["municipal-corporation", "karnataka", "bpas", "building-plan"]
+  },
+  {
+    "id": "bmc-mumbai",
+    "name": "Brihanmumbai Municipal Corporation",
+    "short_name": "BMC/MCGM",
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "country": "India",
+    "aliases": ["mumbai", "bmc", "mcgm", "brihanmumbai", "municipal corporation of greater mumbai"],
+    "jurisdiction_notes": "Use for properties under BMC/MCGM. Development permission and building proposal workflows are handled through official BMC systems and licensed professionals.",
+    "official_website": "https://www.mcgm.gov.in/",
+    "permit_portal": "https://www.mcgm.gov.in/irj/portal/anonymous/qlcedeveplan",
+    "forms_url": "https://www.mcgm.gov.in/",
+    "bylaws_url": "https://www.mcgm.gov.in/",
+    "contact": {
+      "email": "",
+      "phone": "",
+      "address": "Brihanmumbai Municipal Corporation, Mumbai, Maharashtra"
+    },
+    "tags": ["municipal-corporation", "maharashtra", "building-proposal", "development-control"]
+  },
+  {
+    "id": "gda-ghaziabad",
+    "name": "Ghaziabad Development Authority",
+    "short_name": "GDA",
+    "city": "Ghaziabad",
+    "state": "Uttar Pradesh",
+    "country": "India",
+    "aliases": ["ghaziabad", "gda", "ghaziabad development authority"],
+    "jurisdiction_notes": "Use for Ghaziabad Development Authority planning area questions. Verify whether the property falls under GDA, municipal, or industrial authority jurisdiction.",
+    "official_website": "https://gdaghaziabad.in/",
+    "permit_portal": "https://gdaghaziabad.in/",
+    "forms_url": "https://gdaghaziabad.in/",
+    "bylaws_url": "https://gdaghaziabad.in/",
+    "contact": {
+      "email": "",
+      "phone": "",
+      "address": "Ghaziabad Development Authority, Ghaziabad, Uttar Pradesh"
+    },
+    "tags": ["development-authority", "uttar-pradesh", "building-plan", "layout"]
+  },
+  {
+    "id": "noida-authority",
+    "name": "New Okhla Industrial Development Authority",
+    "short_name": "NOIDA Authority",
+    "city": "Noida",
+    "state": "Uttar Pradesh",
+    "country": "India",
+    "aliases": ["noida", "new okhla", "noida authority", "new okhla industrial development authority"],
+    "jurisdiction_notes": "Use for Noida Authority sectors and notified areas. Nearby Greater Noida, YEIDA, or municipal jurisdictions require separate verification.",
+    "official_website": "https://noidaauthorityonline.in/",
+    "permit_portal": "https://buildingcell.noidaauthorityonline.com/",
+    "forms_url": "https://noidaauthorityonline.in/",
+    "bylaws_url": "https://noidaauthorityonline.in/",
+    "contact": {
+      "email": "",
+      "phone": "",
+      "address": "NOIDA Authority, Sector 6, Noida, Uttar Pradesh"
+    },
+    "tags": ["industrial-development-authority", "uttar-pradesh", "building-cell", "obpas"]
+  }
+]

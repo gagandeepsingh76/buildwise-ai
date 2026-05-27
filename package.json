@@ -1,0 +1,19 @@
+{
+  "name": "buildwise-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Authority-aware AI RAG platform for building permissions, permits, zoning, and construction compliance.",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "lint:frontend": "npm --prefix frontend run lint",
+    "dev:backend": "python -m uvicorn app.main:app --app-dir backend --reload --host 0.0.0.0 --port 8000",
+    "test:backend": "python -m pytest backend/tests",
+    "check": "npm --prefix frontend run lint && npm --prefix frontend run build && python -m pytest backend/tests"
+  },
+  "engines": {
+    "node": ">=20.9.0",
+    "npm": ">=10.0.0",
+    "python": ">=3.11"
+  }
+}
