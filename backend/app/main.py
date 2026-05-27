@@ -5,10 +5,19 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
-from app.api.routes import ask, authorities, documents, favorites, feedback, health, history, search
+from app.api.routes import (
+    ask,
+    authorities,
+    documents,
+    favorites,
+    feedback,
+    health,
+    history,
+    search,
+)
+
 from app.core.config import get_settings
 from app.core.logging import configure_logging
-
 
 configure_logging()
 settings = get_settings()
@@ -22,14 +31,16 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# FIXED CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.frontend_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ROUTES
 app.include_router(health.router)
 app.include_router(authorities.router)
 app.include_router(ask.router)
@@ -54,7 +65,12 @@ async def validation_exception_handler(_: Request, exc: RequestValidationError):
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.exception("unhandled_api_error", path=request.url.path, error=str(exc))
+    logger.exception(
+        "unhandled_api_error",
+        path=request.url.path,
+        error=str(exc),
+    )
+
     return JSONResponse(
         status_code=500,
         content={
