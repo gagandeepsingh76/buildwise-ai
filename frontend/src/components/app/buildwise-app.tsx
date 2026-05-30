@@ -5,10 +5,12 @@ import {
   ArrowRight,
   Bookmark,
   Building2,
+  ChevronDown,
   CheckCircle2,
   ClipboardCheck,
   Database,
   Download,
+  Eye,
   ExternalLink,
   FileSearch,
   FileText,
@@ -16,6 +18,7 @@ import {
   History,
   Link2,
   Loader2,
+  Menu as MenuIcon,
   MapPinned,
   MessageSquareText,
   Scale,
@@ -27,7 +30,7 @@ import {
   ThumbsUp,
   UploadCloud,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -234,7 +237,12 @@ export function BuildWiseApp() {
   const [docSearching, setDocSearching] = useState(false);
   const [compareA, setCompareA] = useState("kda-kanpur");
   const [compareB, setCompareB] = useState("dda-delhi");
+  const [activeSection, setActiveSection] = useState("assistant");
+  const [shouldScrollToResult, setShouldScrollToResult] = useState(false);
+  const [resultHighlighted, setResultHighlighted] = useState(false);
+  const [resultInView, setResultInView] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const resultSectionRef = useRef<HTMLDivElement>(null);
 
   const copy = (key: TranslationKey) => t(language, key);
 
@@ -245,6 +253,64 @@ export function BuildWiseApp() {
       if (historyResult.status === "fulfilled") setHistory(historyResult.value);
     });
   }, []);
+
+  useEffect(() => {
+    const sectionIds = ["assistant", "authorities", "admin"];
+    const updateActiveSection = () => {
+      let currentSection = sectionIds[0];
+      sectionIds.forEach((sectionId) => {
+        const section = document.getElementById(sectionId);
+        if (section && section.getBoundingClientRect().top <= 120) {
+          currentSection = sectionId;
+        }
+      });
+      setActiveSection(currentSection);
+    };
+
+    updateActiveSection();
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("resize", updateActiveSection);
+    window.addEventListener("hashchange", updateActiveSection);
+
+    return () => {
+      window.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("resize", updateActiveSection);
+      window.removeEventListener("hashchange", updateActiveSection);
+    };
+  }, []);
+
+  useEffect(() => {
+    const resultSection = resultSectionRef.current;
+    if (!resultSection) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setResultInView(entry.isIntersecting);
+      },
+      { rootMargin: "-72px 0px -35% 0px", threshold: 0.2 },
+    );
+
+    observer.observe(resultSection);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!shouldScrollToResult || loading || !answer) return;
+
+    const timeout = window.setTimeout(() => {
+      const resultSection = resultSectionRef.current;
+      if (!resultSection) return;
+
+      resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      resultSection.focus({ preventScroll: true });
+      setResultHighlighted(true);
+      setShouldScrollToResult(false);
+
+      window.setTimeout(() => setResultHighlighted(false), 1800);
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [answer, loading, shouldScrollToResult]);
 
   const selectedAuthority = authorities.find((item) => item.id === wizard.authority_id);
   const compareLeft = authorities.find((item) => item.id === compareA);
@@ -264,7 +330,7 @@ export function BuildWiseApp() {
 
   async function handleAsk(event?: FormEvent) {
     event?.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim() || loading) return;
     setLoading(true);
     try {
       const response = await askBuildWise({
@@ -289,7 +355,10 @@ export function BuildWiseApp() {
         },
         ...current,
       ].slice(0, 12));
+      setShouldScrollToResult(true);
+      toast.success(copy("analysisComplete"));
     } catch (error) {
+      setShouldScrollToResult(false);
       toast.error(error instanceof Error ? error.message : "Unable to reach the compliance API.");
     } finally {
       setLoading(false);
@@ -415,6 +484,11 @@ export function BuildWiseApp() {
   }
 
   const confidenceValue = answer?.answer.confidence_indicator === "High" ? 88 : answer?.answer.confidence_indicator === "Medium" ? 58 : 24;
+  const navItems = [
+    { id: "assistant", label: copy("navProduct") },
+    { id: "authorities", label: copy("navAuthorities") },
+    { id: "admin", label: copy("navAdmin") },
+  ];
 
   return (
     <div className="min-h-screen overflow-hidden">
@@ -424,21 +498,16 @@ export function BuildWiseApp() {
             <span className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-teal-300 via-emerald-300 to-amber-300 text-slate-950">
               <Building2 className="size-5" />
             </span>
-            <span className="text-base font-semibold">BuildWise AI</span>
+            <span className="hidden text-base font-semibold min-[420px]:inline">BuildWise AI</span>
           </a>
-          <nav className="hidden items-center gap-2 md:flex" aria-label="Primary navigation">
-            <a className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-white/10" href="#assistant">
-              {copy("navProduct")}
-            </a>
-            <a className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-white/10" href="#authorities">
-              {copy("navAuthorities")}
-            </a>
-            <a className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-white/10" href="#admin">
-              {copy("navAdmin")}
-            </a>
-          </nav>
           <div className="flex items-center gap-2">
             <LanguageToggle language={language} onChange={setLanguage} label={copy("language")} />
+            <NavDropdown
+              items={navItems}
+              activeSection={activeSection}
+              label={copy("menu")}
+              onNavigate={setActiveSection}
+            />
             <ThemeToggle label={copy("theme")} />
           </div>
         </div>
@@ -511,15 +580,23 @@ export function BuildWiseApp() {
                   updateWizard={updateWizard}
                 />
 
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button type="submit" variant="premium" size="lg" className="flex-1" disabled={loading}>
-                    {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                    {copy("askButton")}
-                  </Button>
-                  <Button type="button" variant="secondary" size="lg" onClick={() => setQuery(sampleQueries[language][1])}>
-                    <Search className="size-4" />
-                    {language === "hi" ? "उदाहरण" : "Example"}
-                  </Button>
+                <div className="sticky bottom-3 z-20 space-y-2 rounded-lg border border-slate-200/70 bg-white/85 p-2 shadow-lg backdrop-blur dark:border-white/10 dark:bg-slate-950/75 sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button type="submit" variant="premium" size="lg" className="flex-1" disabled={loading}>
+                      {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                      {loading ? copy("analyzing") : copy("askButton")}
+                    </Button>
+                    <Button type="button" variant="secondary" size="lg" onClick={() => setQuery(sampleQueries[language][1])}>
+                      <Search className="size-4" />
+                      {language === "hi" ? "उदाहरण" : "Example"}
+                    </Button>
+                  </div>
+                  {loading && (
+                    <div className="flex items-center gap-2 rounded-md border border-teal-500/20 bg-teal-500/10 px-3 py-2 text-xs font-medium text-teal-800 dark:text-teal-100">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      {copy("checkingRules")}
+                    </div>
+                  )}
                 </div>
               </form>
             </motion.div>
@@ -537,7 +614,15 @@ export function BuildWiseApp() {
 
         <section className="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_360px] lg:px-8">
           <div className="space-y-6">
-            <div className="glass-panel rounded-lg p-5">
+            <div
+              id="grounded-answer"
+              ref={resultSectionRef}
+              tabIndex={-1}
+              className={cn(
+                "glass-panel scroll-mt-24 rounded-lg p-5 outline-none transition-[border-color,box-shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-teal-400/70",
+                resultHighlighted && "answer-glow",
+              )}
+            >
               <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-slate-950 dark:text-white">{copy("answerTitle")}</h2>
@@ -563,7 +648,7 @@ export function BuildWiseApp() {
                 )}
               </div>
 
-              {loading && <LoadingAnswer copy={copy("loading")} />}
+              {loading && <LoadingAnswer copy={copy("checkingRules")} />}
 
               {!loading && !answer && (
                 <div className="rounded-lg border border-dashed border-slate-300 p-10 text-center dark:border-white/15">
@@ -581,7 +666,7 @@ export function BuildWiseApp() {
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
                       <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">{copy("isAllowed")}</p>
-                      <div className="mt-2 flex items-center justify-between gap-3">
+                      <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <span className="text-2xl font-semibold text-slate-950 dark:text-white">{answer.answer.is_allowed}</span>
                         <Badge className={cn("ring-1", formatConfidence(answer.answer.confidence_indicator))}>
                           {copy("confidence")}: {answer.answer.confidence_indicator}
@@ -884,12 +969,120 @@ export function BuildWiseApp() {
         </section>
       </main>
 
+      <AnimatePresence>
+        {loading && !resultInView && (
+          <motion.button
+            type="button"
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            onClick={() => resultSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="fixed bottom-5 right-4 z-50 inline-flex items-center gap-2 rounded-lg border border-teal-200/70 bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-2xl shadow-teal-950/25 transition hover:-translate-y-0.5 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:right-6"
+          >
+            <Eye className="size-4" />
+            {copy("viewResult")}
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       <footer className="bg-slate-950 px-4 py-8 text-sm text-slate-400 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <span>{copy("footer")}</span>
           <span>Vercel · Render · Supabase · pgvector</span>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function NavDropdown({
+  items,
+  activeSection,
+  label,
+  onNavigate,
+}: {
+  items: Array<{ id: string; label: string }>;
+  activeSection: string;
+  label: string;
+  onNavigate: (sectionId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+
+    window.addEventListener("pointerdown", closeOnOutsideClick);
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsideClick);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  return (
+    <div ref={menuRef} className="relative">
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <MenuIcon className="size-4" />
+        <span className="hidden sm:inline">{label}</span>
+        <ChevronDown className={cn("size-4 transition-transform duration-200", open && "rotate-180")} />
+      </Button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-lg border border-white/12 bg-slate-950/95 p-1.5 shadow-2xl shadow-slate-950/30 backdrop-blur-xl"
+            role="menu"
+          >
+            {items.map((item) => {
+              const active = activeSection === item.id;
+              return (
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  role="menuitem"
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => {
+                    onNavigate(item.id);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:bg-white/10 focus-visible:outline-none",
+                    active && "bg-teal-400/15 text-teal-100 ring-1 ring-inset ring-teal-300/25",
+                  )}
+                >
+                  <span>{item.label}</span>
+                  {active && <CheckCircle2 className="size-4 text-teal-200" />}
+                </a>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

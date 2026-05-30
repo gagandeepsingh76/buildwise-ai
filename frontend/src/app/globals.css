@@ -90,3 +90,30 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(20, 184, 166, 0.45) transparent;
 }
+
+.answer-glow {
+  animation: answer-glow 1.8s ease-out;
+}
+
+@keyframes answer-glow {
+  0% {
+    border-color: rgba(45, 212, 191, 0.9);
+    box-shadow:
+      0 0 0 4px rgba(20, 184, 166, 0.18),
+      0 24px 80px rgba(20, 184, 166, 0.22);
+    transform: translateY(-2px);
+  }
+
+  55% {
+    border-color: rgba(245, 158, 11, 0.55);
+    box-shadow:
+      0 0 0 3px rgba(245, 158, 11, 0.12),
+      0 24px 80px rgba(20, 184, 166, 0.16);
+  }
+
+  100% {
+    border-color: var(--border);
+    box-shadow: 0 24px 80px rgba(7, 16, 15, 0.12);
+    transform: translateY(0);
+  }
+}
