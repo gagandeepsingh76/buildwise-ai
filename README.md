@@ -24,10 +24,7 @@
 
 <p align="center">
   <img
-    src="docs/screenshots/buildwise-product-preview.svg"
-    alt="BuildWise AI product screenshot placeholder"
-    width="960"
-  />
+    <img width="960" height="629" alt="image" src="https://github.com/user-attachments/assets/a02be2b2-5e2b-464b-9713-2059ff182b21"   alt="BuildWise AI product screenshot placeholder" />
 </p>
 
 ---
@@ -35,44 +32,6 @@
 BuildWise AI is a production-grade, authority-aware AI SaaS platform for building permissions, zoning, permits, construction compliance, FAR/FSI, setbacks, occupancy, inspections, and required documents.
 
 BuildWise AI is an Authority-Aware RAG platform that helps architects, builders, civil engineers, consultants, and property owners understand building regulations, permits, approvals, setbacks, FAR/FSI limits, occupancy requirements, and construction compliance using official authority documents.
-
----
-
-## Table of Contents
-
-- [Live Demo](#live-demo)
-- [Backend API](#backend-api)
-- [Health Endpoint](#health-endpoint)
-- [GitHub Repository](#github-repository)
-- [Product Preview](#product-preview)
-- [Product Screenshots](#product-screenshots)
-- [Live Walkthrough](#live-walkthrough)
-- [Why BuildWise AI?](#why-buildwise-ai)
-- [Problem Statement](#problem-statement)
-- [System Architecture](#system-architecture)
-- [How RAG Works](#how-rag-works)
-- [Application Interface](#application-interface)
-- [Core Behavior](#core-behavior)
-- [Key Features](#key-features)
-- [Technology Stack](#technology-stack)
-- [Project Architecture](#project-architecture)
-- [AI Capabilities](#ai-capabilities)
-- [API Modules](#api-modules)
-- [Environment Variables](#environment-variables)
-- [Local Setup](#local-setup)
-- [Supabase Setup](#supabase-setup)
-- [Docker Setup](#docker-setup)
-- [PDF Ingestion](#pdf-ingestion)
-- [Deployment](#deployment)
-- [Deployment Status](#deployment-status)
-- [Verification](#verification)
-- [Sample Questions](#sample-questions)
-- [Sample Usage Flow](#sample-usage-flow)
-- [Security & Compliance](#security--compliance)
-- [Known Limitations](#known-limitations)
-- [Future Improvements](#future-improvements)
-- [Author](#author)
-- [License](#license)
 
 ---
 
@@ -130,46 +89,27 @@ Source code:
 
 ---
 
-## Product Preview
-
-BuildWise AI is designed like a modern AI SaaS product: fast, responsive, source-grounded, and optimized for professionals who need clear compliance answers.
-
-| Assistant | Grounded Answer | Authority Console |
-|---|---|---|
-| ![Assistant preview placeholder](docs/screenshots/buildwise-assistant.png) | ![Grounded answer preview placeholder](docs/screenshots/grounded-answer.png) | ![Authority console preview placeholder](docs/screenshots/authority-console.png) |
-
----
-
 ## Product Screenshots
 
 ### Compliance Assistant
 
 <p align="center">
-  <img
-    src="docs/screenshots/buildwise-assistant.png"
-    alt="BuildWise AI compliance assistant screenshot placeholder"
-    width="900"
-  />
+ <img width="1365" height="630" alt="image" src="https://github.com/user-attachments/assets/fc13472d-8daf-4701-b1c4-854fb5a025f4" />
+
 </p>
 
 ### Grounded Compliance Result
 
 <p align="center">
-  <img
-    src="docs/screenshots/grounded-answer.png"
-    alt="BuildWise AI grounded answer screenshot placeholder"
-    width="900"
-  />
+<img width="1362" height="626" alt="image" src="https://github.com/user-attachments/assets/c1a9f1c0-85c2-4588-a2a1-97aaa4dcc115" />
+
 </p>
 
 ### Authority Intelligence Dashboard
 
 <p align="center">
-  <img
-    src="docs/screenshots/authority-dashboard.png"
-    alt="BuildWise AI authority dashboard screenshot placeholder"
-    width="900"
-  />
+ <img width="1362" height="622" alt="image" src="https://github.com/user-attachments/assets/3a666034-2976-4be5-9db3-151050ef9a72" />
+
 </p>
 
 ---
@@ -177,11 +117,8 @@ BuildWise AI is designed like a modern AI SaaS product: fast, responsive, source
 ## Live Walkthrough
 
 <p align="center">
-  <img
-    src="docs/demo/buildwise-live-walkthrough.gif"
-    alt="BuildWise AI live walkthrough GIF placeholder"
-    width="900"
-  />
+  <img width="1365" height="616" alt="image" src="https://github.com/user-attachments/assets/ae70a8b7-a535-4283-9ef2-dcf4b62637a9" />
+
 </p>
 
 ---
