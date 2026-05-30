@@ -15,8 +15,8 @@ const buttonVariants = cva(
         premium:
           "bg-gradient-to-r from-teal-500 via-emerald-500 to-amber-400 text-slate-950 shadow-lg shadow-teal-500/20 hover:translate-y-[-1px]",
         secondary:
-          "border border-slate-200 bg-white/70 text-slate-800 hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15",
-        ghost: "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10",
+          "border border-slate-300 bg-white text-slate-900 shadow-sm hover:border-slate-400 hover:bg-slate-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15",
+        ghost: "text-slate-800 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10",
         danger: "bg-rose-600 text-white hover:bg-rose-700",
       },
       size: {

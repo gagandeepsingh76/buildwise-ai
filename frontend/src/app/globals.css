@@ -1,21 +1,44 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f7f6f2;
-  --foreground: #17201f;
-  --muted: #64706e;
-  --panel: rgba(255, 255, 255, 0.82);
-  --panel-strong: rgba(255, 255, 255, 0.94);
-  --border: rgba(20, 31, 30, 0.12);
+:root,
+.light {
+  color-scheme: light;
+  --background: #f6f8fb;
+  --foreground: #0f172a;
+  --muted: #526071;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #526071;
+  --surface: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-muted: #eef3f8;
+  --panel: #ffffff;
+  --panel-strong: #ffffff;
+  --border: #cbd5e1;
+  --border-strong: #94a3b8;
+  --shadow-soft: 0 10px 28px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 18px 44px rgba(15, 23, 42, 0.1);
+  --shadow-panel: 0 24px 72px rgba(15, 23, 42, 0.12);
 }
 
 .dark {
+  color-scheme: dark;
   --background: #07100f;
   --foreground: #f4f7f2;
   --muted: #9ca8a5;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --surface: rgba(8, 20, 18, 0.92);
+  --surface-subtle: rgba(255, 255, 255, 0.06);
+  --surface-muted: rgba(255, 255, 255, 0.1);
   --panel: rgba(7, 16, 15, 0.72);
   --panel-strong: rgba(8, 20, 18, 0.9);
   --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.22);
+  --shadow-card: 0 22px 56px rgba(0, 0, 0, 0.24);
+  --shadow-panel: 0 24px 80px rgba(0, 0, 0, 0.26);
 }
 
 @theme inline {
@@ -37,7 +60,7 @@ html {
 body {
   min-height: 100vh;
   background:
-    linear-gradient(180deg, rgba(247, 246, 242, 0.94), rgba(239, 246, 241, 0.9) 42%, rgba(247, 246, 242, 1)),
+    linear-gradient(180deg, rgba(246, 248, 251, 0.98), rgba(238, 245, 242, 0.96) 42%, rgba(246, 248, 251, 1)),
     var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
@@ -63,9 +86,9 @@ body {
 
 .mesh-band {
   background:
-    linear-gradient(135deg, rgba(20, 184, 166, 0.14), transparent 34%),
-    linear-gradient(225deg, rgba(245, 158, 11, 0.14), transparent 36%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.4));
+    linear-gradient(135deg, rgba(20, 184, 166, 0.1), transparent 34%),
+    linear-gradient(225deg, rgba(245, 158, 11, 0.1), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(241, 245, 249, 0.86));
 }
 
 .dark .mesh-band {
@@ -78,12 +101,41 @@ body {
 .glass-panel {
   border: 1px solid var(--border);
   background: var(--panel);
-  box-shadow: 0 24px 80px rgba(7, 16, 15, 0.12);
+  box-shadow: var(--shadow-panel);
   backdrop-filter: blur(22px);
 }
 
 .dark .glass-panel {
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
+  box-shadow: var(--shadow-panel);
+}
+
+.bw-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.bw-card-soft {
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
+  box-shadow: var(--shadow-soft);
+}
+
+.bw-card-inset {
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.bw-text-primary {
+  color: var(--text-primary);
+}
+
+.bw-text-secondary {
+  color: var(--text-secondary);
+}
+
+.bw-text-muted {
+  color: var(--text-muted);
 }
 
 .scrollbar-thin {
@@ -113,7 +165,7 @@ body {
 
   100% {
     border-color: var(--border);
-    box-shadow: 0 24px 80px rgba(7, 16, 15, 0.12);
+    box-shadow: var(--shadow-panel);
     transform: translateY(0);
   }
 }

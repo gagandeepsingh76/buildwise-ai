@@ -492,9 +492,9 @@ export function BuildWiseApp() {
 
   return (
     <div className="min-h-screen overflow-hidden">
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <a href="#assistant" className="flex items-center gap-3 text-white" aria-label="BuildWise AI">
+          <a href="#assistant" className="bw-text-primary flex items-center gap-3" aria-label="BuildWise AI">
             <span className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-teal-300 via-emerald-300 to-amber-300 text-slate-950">
               <Building2 className="size-5" />
             </span>
@@ -537,7 +537,7 @@ export function BuildWiseApp() {
                     key={item}
                     type="button"
                     onClick={() => setQuery(item)}
-                    className="rounded-lg border border-white/14 bg-white/10 px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-white/16"
+                    className="rounded-lg border border-white/14 bg-white/10 px-3 py-2 text-left text-sm text-white transition hover:bg-white/16"
                   >
                     {item}
                   </button>
@@ -549,13 +549,13 @@ export function BuildWiseApp() {
               initial={{ opacity: 0, y: 22 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12, duration: 0.7 }}
-              className="glass-panel self-end rounded-lg p-4 text-slate-950 dark:text-white lg:self-center"
+              className="glass-panel bw-text-primary self-end rounded-lg p-4 lg:self-center"
             >
               <form onSubmit={handleAsk} className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-950 dark:text-white">{copy("wizardTitle")}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="bw-text-primary text-sm font-semibold">{copy("wizardTitle")}</p>
+                    <p className="bw-text-muted text-xs">
                       {selectedAuthority?.short_name || "Authority"} · {wizard.city || "City"}
                     </p>
                   </div>
@@ -580,7 +580,7 @@ export function BuildWiseApp() {
                   updateWizard={updateWizard}
                 />
 
-                <div className="sticky bottom-3 z-20 space-y-2 rounded-lg border border-slate-200/70 bg-white/85 p-2 shadow-lg backdrop-blur dark:border-white/10 dark:bg-slate-950/75 sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
+                <div className="sticky bottom-3 z-20 space-y-2 rounded-lg border border-slate-300 bg-white p-2 shadow-lg backdrop-blur dark:border-white/10 dark:bg-slate-950/75 sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Button type="submit" variant="premium" size="lg" className="flex-1" disabled={loading}>
                       {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
@@ -603,7 +603,7 @@ export function BuildWiseApp() {
           </div>
         </section>
 
-        <section className="mesh-band border-y border-slate-200/70 py-10 dark:border-white/10">
+        <section className="mesh-band border-y border-slate-200/80 py-10 dark:border-white/10">
           <div className="mx-auto grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-4 lg:px-8">
             <Metric icon={MapPinned} label="Jurisdictions" value={`${authorities.length}`} />
             <Metric icon={FileText} label="Indexed docs" value={`${documents.length}`} />
@@ -625,8 +625,8 @@ export function BuildWiseApp() {
             >
               <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-950 dark:text-white">{copy("answerTitle")}</h2>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                  <h2 className="bw-text-primary text-xl font-semibold">{copy("answerTitle")}</h2>
+                  <p className="bw-text-muted text-sm">
                     {answer?.jurisdiction ? `${answer.jurisdiction.short_name} · ${answer.jurisdiction.city}` : copy("emptyAnswer")}
                   </p>
                 </div>
@@ -653,21 +653,21 @@ export function BuildWiseApp() {
               {!loading && !answer && (
                 <div className="rounded-lg border border-dashed border-slate-300 p-10 text-center dark:border-white/15">
                   <MessageSquareText className="mx-auto size-10 text-teal-500" />
-                  <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">{copy("emptyAnswer")}</p>
+                  <p className="bw-text-muted mt-3 text-sm">{copy("emptyAnswer")}</p>
                 </div>
               )}
 
               {!loading && answer && (
                 <div className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-[1.4fr_.6fr]">
-                    <div className="rounded-lg border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
-                      <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">{copy("quickSummary")}</p>
-                      <p className="mt-2 text-base leading-7 text-slate-800 dark:text-slate-100">{answer.answer.quick_summary}</p>
+                    <div className="bw-card rounded-lg p-4">
+                      <p className="bw-text-muted text-xs font-semibold uppercase">{copy("quickSummary")}</p>
+                      <p className="bw-text-primary mt-2 text-base leading-7">{answer.answer.quick_summary}</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
-                      <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">{copy("isAllowed")}</p>
+                    <div className="bw-card rounded-lg p-4">
+                      <p className="bw-text-muted text-xs font-semibold uppercase">{copy("isAllowed")}</p>
                       <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <span className="text-2xl font-semibold text-slate-950 dark:text-white">{answer.answer.is_allowed}</span>
+                        <span className="bw-text-primary text-2xl font-semibold">{answer.answer.is_allowed}</span>
                         <Badge className={cn("ring-1", formatConfidence(answer.answer.confidence_indicator))}>
                           {copy("confidence")}: {answer.answer.confidence_indicator}
                         </Badge>
@@ -681,12 +681,12 @@ export function BuildWiseApp() {
                       const Icon = section.icon;
                       const items = answer.answer[section.key] as string[];
                       return (
-                        <div key={section.key} className="rounded-lg border border-slate-200 bg-white/65 p-4 dark:border-white/10 dark:bg-white/5">
+                        <div key={section.key} className="bw-card rounded-lg p-4">
                           <div className="flex items-center gap-2">
                             <Icon className="size-4 text-teal-600 dark:text-teal-300" />
-                            <h3 className="text-sm font-semibold text-slate-950 dark:text-white">{copy(section.label)}</h3>
+                            <h3 className="bw-text-primary text-sm font-semibold">{copy(section.label)}</h3>
                           </div>
-                          <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
+                          <ul className="bw-text-secondary mt-3 space-y-2 text-sm leading-6">
                             {items.map((item, index) => (
                               <li key={`${section.key}-${index}`} className="flex gap-2">
                                 <span className="mt-2 size-1.5 shrink-0 rounded-full bg-amber-500" />
@@ -699,8 +699,8 @@ export function BuildWiseApp() {
                     })}
                   </div>
 
-                  <div className="rounded-lg border border-slate-200 bg-white/65 p-4 dark:border-white/10 dark:bg-white/5">
-                    <h3 className="text-sm font-semibold text-slate-950 dark:text-white">{copy("links")}</h3>
+                  <div className="bw-card rounded-lg p-4">
+                    <h3 className="bw-text-primary text-sm font-semibold">{copy("links")}</h3>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {answer.answer.official_authority_links.map((link) => (
                         <a
@@ -708,7 +708,7 @@ export function BuildWiseApp() {
                           href={link}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-teal-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm hover:border-teal-400 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                         >
                           {truncateMiddle(link, 42)}
                           <ExternalLink className="size-3.5" />
@@ -728,8 +728,8 @@ export function BuildWiseApp() {
                     </Button>
                   </div>
 
-                  <div className="rounded-lg border border-slate-200 bg-white/65 p-4 dark:border-white/10 dark:bg-white/5">
-                    <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
+                  <div className="bw-card rounded-lg p-4">
+                    <h3 className="bw-text-primary text-sm font-semibold">
                       {language === "hi" ? "अगले प्रश्न" : "Suggested next questions"}
                     </h3>
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -738,7 +738,7 @@ export function BuildWiseApp() {
                           key={question}
                           type="button"
                           onClick={() => setQuery(question)}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 hover:border-teal-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm font-medium text-slate-800 shadow-sm hover:border-teal-400 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                         >
                           {question}
                         </button>
@@ -751,7 +751,7 @@ export function BuildWiseApp() {
 
             <div className="glass-panel rounded-lg p-5">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-slate-950 dark:text-white">{copy("sourcesTitle")}</h2>
+                <h2 className="bw-text-primary text-xl font-semibold">{copy("sourcesTitle")}</h2>
                 <Badge className="bg-slate-900/5 text-slate-700 ring-slate-900/10 dark:bg-white/10 dark:text-slate-200 dark:ring-white/10">
                   {answer?.sources.length || 0} sources
                 </Badge>
@@ -761,7 +761,7 @@ export function BuildWiseApp() {
                   <SourceCard key={`${source.document_id}-${source.chunk_id}`} source={source} />
                 ))}
                 {answer && answer.sources.length === 0 && (
-                  <p className="rounded-lg border border-dashed border-slate-300 p-6 text-sm text-slate-600 dark:border-white/15 dark:text-slate-400">
+                  <p className="bw-text-muted rounded-lg border border-dashed border-slate-300 p-6 text-sm dark:border-white/15">
                     No source cards were returned because the assistant requested clarification first.
                   </p>
                 )}
@@ -771,7 +771,7 @@ export function BuildWiseApp() {
 
           <aside className="space-y-6">
             <SidePanel title={copy("checklist")} icon={ClipboardCheck}>
-              <ol className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
+              <ol className="bw-text-secondary space-y-3 text-sm">
                 {checklist.map((item, index) => (
                   <li key={`${item}-${index}`} className="flex gap-3">
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-xs font-semibold text-teal-700 dark:text-teal-200">
@@ -790,12 +790,12 @@ export function BuildWiseApp() {
                     key={item.id}
                     type="button"
                     onClick={() => setQuery(item.query)}
-                    className="w-full rounded-lg border border-slate-200 bg-white/60 p-3 text-left text-sm text-slate-700 hover:border-teal-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                    className="bw-card-soft w-full rounded-lg p-3 text-left text-sm text-slate-800 transition hover:border-teal-400 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/10"
                   >
                     {item.query}
                   </button>
                 ))}
-                {history.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">No recent searches.</p>}
+                {history.length === 0 && <p className="bw-text-muted text-sm">No recent searches.</p>}
               </div>
             </SidePanel>
 
@@ -818,9 +818,9 @@ export function BuildWiseApp() {
                     key={`${result.document_id}-${result.chunk_id}`}
                     type="button"
                     onClick={() => setQuery(result.excerpt)}
-                    className="w-full rounded-lg border border-slate-200 bg-white/60 p-3 text-left text-xs leading-5 text-slate-700 hover:border-teal-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                    className="bw-card-soft w-full rounded-lg p-3 text-left text-xs leading-5 text-slate-800 transition hover:border-teal-400 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/10"
                   >
-                    <span className="block font-semibold text-slate-900 dark:text-white">{result.document_title}</span>
+                    <span className="bw-text-primary block font-semibold">{result.document_title}</span>
                     {result.excerpt.slice(0, 180)}
                   </button>
                 ))}
@@ -834,23 +834,23 @@ export function BuildWiseApp() {
                     key={item.query_id}
                     type="button"
                     onClick={() => setAnswer(item)}
-                    className="w-full rounded-lg border border-slate-200 bg-white/60 p-3 text-left text-sm text-slate-700 hover:border-amber-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                    className="bw-card-soft w-full rounded-lg p-3 text-left text-sm text-slate-800 transition hover:border-amber-400 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/10"
                   >
                     {item.answer.quick_summary.slice(0, 120)}
                   </button>
                 ))}
-                {bookmarks.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">No bookmarks.</p>}
+                {bookmarks.length === 0 && <p className="bw-text-muted text-sm">No bookmarks.</p>}
               </div>
             </SidePanel>
           </aside>
         </section>
 
-        <section id="authorities" className="border-y border-slate-200/70 bg-white/45 py-12 dark:border-white/10 dark:bg-white/[0.03]">
+        <section id="authorities" className="border-y border-slate-200/80 bg-slate-50/90 py-12 dark:border-white/10 dark:bg-white/[0.03]">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-2xl font-semibold text-slate-950 dark:text-white">{copy("navAuthorities")}</h2>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                <h2 className="bw-text-primary text-2xl font-semibold">{copy("navAuthorities")}</h2>
+                <p className="bw-text-muted mt-1 text-sm">
                   KDA, LDA, DDA/MCD, BBMP/BDA, BMC, GDA, and NOIDA Authority are preconfigured.
                 </p>
               </div>
@@ -868,7 +868,7 @@ export function BuildWiseApp() {
 
         <section className="mx-auto grid max-w-7xl gap-6 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:px-8">
           <div className="glass-panel rounded-lg p-5">
-            <h2 className="text-xl font-semibold text-slate-950 dark:text-white">{copy("compare")}</h2>
+            <h2 className="bw-text-primary text-xl font-semibold">{copy("compare")}</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <AuthoritySelect value={compareA} authorities={authorities} onValueChange={setCompareA} />
               <AuthoritySelect value={compareB} authorities={authorities} onValueChange={setCompareB} />
@@ -876,9 +876,9 @@ export function BuildWiseApp() {
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {[compareLeft, compareRight].map((authority) =>
                 authority ? (
-                  <div key={authority.id} className="rounded-lg border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
-                    <p className="text-sm font-semibold text-slate-950 dark:text-white">{authority.short_name}</p>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{authority.city}, {authority.state}</p>
+                  <div key={authority.id} className="bw-card rounded-lg p-4">
+                    <p className="bw-text-primary text-sm font-semibold">{authority.short_name}</p>
+                    <p className="bw-text-muted mt-1 text-sm">{authority.city}, {authority.state}</p>
                     <div className="mt-3 space-y-2 text-sm">
                       <LinkRow href={authority.official_website} label="Website" />
                       <LinkRow href={authority.permit_portal} label="Permit" />
@@ -891,7 +891,7 @@ export function BuildWiseApp() {
           </div>
 
           <div className="glass-panel rounded-lg p-5">
-            <h2 className="text-xl font-semibold text-slate-950 dark:text-white">{copy("faq")}</h2>
+            <h2 className="bw-text-primary text-xl font-semibold">{copy("faq")}</h2>
             <div className="mt-4 divide-y divide-slate-200 dark:divide-white/10">
               <FaqItem
                 question="Does BuildWise AI answer without documents?"
@@ -909,22 +909,22 @@ export function BuildWiseApp() {
           </div>
         </section>
 
-        <section id="admin" className="border-t border-slate-200/70 bg-slate-950 py-12 text-white dark:border-white/10">
+        <section id="admin" className="border-t border-slate-200/80 bg-slate-50 py-12 text-slate-950 dark:border-white/10 dark:bg-slate-950 dark:text-white">
           <div className="mx-auto grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-[0.85fr_1.15fr] lg:px-8">
             <div>
-              <Badge className="bg-white/10 text-teal-100 ring-white/15">
+              <Badge className="bg-teal-500/15 text-teal-700 ring-teal-500/20 dark:bg-white/10 dark:text-teal-100 dark:ring-white/15">
                 <UploadCloud className="mr-1 size-3.5" />
                 {copy("upload")}
               </Badge>
               <h2 className="mt-4 text-3xl font-semibold">Document intelligence console</h2>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                 Upload real PDFs, tag jurisdiction metadata, and index chunks into Supabase pgvector. Uploaded authority documents are prioritized over seeded authority profiles.
               </p>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 {documents.slice(0, 4).map((document) => (
-                  <div key={document.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div key={document.id} className="bw-card-soft rounded-lg p-3">
                     <p className="text-sm font-semibold">{document.title}</p>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="bw-text-muted mt-1 text-xs">
                       {document.status} · {document.chunk_count} chunks
                     </p>
                   </div>
@@ -932,13 +932,13 @@ export function BuildWiseApp() {
               </div>
             </div>
 
-            <form onSubmit={handleUpload} className="rounded-lg border border-white/10 bg-white/8 p-5 backdrop-blur-xl">
+            <form onSubmit={handleUpload} className="bw-card rounded-lg p-5 backdrop-blur-xl">
               <div className="grid gap-3 sm:grid-cols-2">
-                <Input name="title" placeholder="Document title" required className="border-white/10 bg-white/10 text-white placeholder:text-slate-400" />
-                <Input name="document_type" placeholder="bylaws / permit-manual" required className="border-white/10 bg-white/10 text-white placeholder:text-slate-400" />
+                <Input name="title" placeholder="Document title" required />
+                <Input name="document_type" placeholder="bylaws / permit-manual" required />
                 <select
                   name="authority_id"
-                  className="h-11 rounded-lg border border-white/10 bg-slate-900 px-3 text-sm text-white outline-none focus:ring-2 focus:ring-teal-500/30"
+                  className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:focus:ring-teal-500/30"
                   required
                 >
                   {authorities.map((authority) => (
@@ -947,18 +947,18 @@ export function BuildWiseApp() {
                     </option>
                   ))}
                 </select>
-                <Input name="issuing_department" placeholder="Issuing department" className="border-white/10 bg-white/10 text-white placeholder:text-slate-400" />
-                <Input name="city" placeholder="City" required defaultValue="Kanpur" className="border-white/10 bg-white/10 text-white placeholder:text-slate-400" />
-                <Input name="state" placeholder="State" required defaultValue="Uttar Pradesh" className="border-white/10 bg-white/10 text-white placeholder:text-slate-400" />
-                <Input name="official_url" placeholder="Official URL" className="border-white/10 bg-white/10 text-white placeholder:text-slate-400 sm:col-span-2" />
-                <Input name="tags" placeholder="tags, comma, separated" className="border-white/10 bg-white/10 text-white placeholder:text-slate-400 sm:col-span-2" />
+                <Input name="issuing_department" placeholder="Issuing department" />
+                <Input name="city" placeholder="City" required defaultValue="Kanpur" />
+                <Input name="state" placeholder="State" required defaultValue="Uttar Pradesh" />
+                <Input name="official_url" placeholder="Official URL" className="sm:col-span-2" />
+                <Input name="tags" placeholder="tags, comma, separated" className="sm:col-span-2" />
                 <Input
                   value={adminKey}
                   onChange={(event) => setAdminKey(event.target.value)}
                   placeholder="Admin API key"
-                  className="border-white/10 bg-white/10 text-white placeholder:text-slate-400 sm:col-span-2"
+                  className="sm:col-span-2"
                 />
-                <Input ref={fileRef} name="file" type="file" accept="application/pdf" required className="border-white/10 bg-white/10 text-white sm:col-span-2" />
+                <Input ref={fileRef} name="file" type="file" accept="application/pdf" required className="sm:col-span-2" />
               </div>
               <Button type="submit" variant="premium" size="lg" className="mt-4 w-full" disabled={uploading}>
                 {uploading ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
@@ -1055,7 +1055,7 @@ function NavDropdown({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.16, ease: "easeOut" }}
-            className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-lg border border-white/12 bg-slate-950/95 p-1.5 shadow-2xl shadow-slate-950/30 backdrop-blur-xl"
+            className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-lg border border-slate-300 bg-white p-1.5 shadow-2xl shadow-slate-950/15 backdrop-blur-xl dark:border-white/12 dark:bg-slate-950/95 dark:shadow-slate-950/30"
             role="menu"
           >
             {items.map((item) => {
@@ -1071,12 +1071,12 @@ function NavDropdown({
                     setOpen(false);
                   }}
                   className={cn(
-                    "flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:bg-white/10 focus-visible:outline-none",
-                    active && "bg-teal-400/15 text-teal-100 ring-1 ring-inset ring-teal-300/25",
+                    "flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:bg-slate-100 focus-visible:outline-none dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white dark:focus-visible:bg-white/10",
+                    active && "bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-200 dark:bg-teal-400/15 dark:text-teal-100 dark:ring-teal-300/25",
                   )}
                 >
                   <span>{item.label}</span>
-                  {active && <CheckCircle2 className="size-4 text-teal-200" />}
+                  {active && <CheckCircle2 className="size-4 text-teal-700 dark:text-teal-200" />}
                 </a>
               );
             })}
@@ -1171,14 +1171,14 @@ function Field({
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">{children}</span>;
+  return <span className="bw-text-muted mb-1.5 block text-xs font-semibold">{children}</span>;
 }
 
 function LoadingAnswer({ copy }: { copy: string }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-slate-200 bg-white/60 p-4 dark:border-white/10 dark:bg-white/5">
-        <div className="mb-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+      <div className="bw-card-soft rounded-lg p-4">
+        <div className="bw-text-muted mb-3 flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin text-teal-500" />
           {copy}
         </div>
@@ -1196,11 +1196,11 @@ function LoadingAnswer({ copy }: { copy: string }) {
 
 function SourceCard({ source }: { source: AskResponse["sources"][number] }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
+    <div className="bw-card rounded-lg p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="font-semibold text-slate-950 dark:text-white">{source.document_title}</p>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <p className="bw-text-primary font-semibold">{source.document_title}</p>
+          <p className="bw-text-muted mt-1 text-sm">
             {source.authority_name} · {source.city}, {source.state}
             {source.page_start ? ` · p.${source.page_start}${source.page_end && source.page_end !== source.page_start ? `-${source.page_end}` : ""}` : ""}
           </p>
@@ -1209,7 +1209,7 @@ function SourceCard({ source }: { source: AskResponse["sources"][number] }) {
           {Math.round(source.score * 100)}%
         </Badge>
       </div>
-      <p className="mt-3 text-sm leading-6 text-slate-700 dark:text-slate-300">{source.excerpt}</p>
+      <p className="bw-text-secondary mt-3 text-sm leading-6">{source.excerpt}</p>
       {source.official_url && (
         <a
           href={source.official_url}
@@ -1238,7 +1238,7 @@ function SidePanel({
     <div className="glass-panel rounded-lg p-5">
       <div className="mb-4 flex items-center gap-2">
         <Icon className="size-4 text-teal-600 dark:text-teal-300" />
-        <h2 className="text-base font-semibold text-slate-950 dark:text-white">{title}</h2>
+        <h2 className="bw-text-primary text-base font-semibold">{title}</h2>
       </div>
       {children}
     </div>
@@ -1247,10 +1247,10 @@ function SidePanel({
 
 function Metric({ icon: Icon, label, value }: { icon: typeof Building2; label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
+    <div className="bw-card rounded-lg p-4">
       <Icon className="size-5 text-teal-600 dark:text-teal-300" />
-      <p className="mt-3 text-2xl font-semibold text-slate-950 dark:text-white">{value}</p>
-      <p className="text-sm text-slate-600 dark:text-slate-400">{label}</p>
+      <p className="bw-text-primary mt-3 text-2xl font-semibold">{value}</p>
+      <p className="bw-text-muted text-sm">{label}</p>
     </div>
   );
 }
@@ -1262,7 +1262,7 @@ function AuthorityCard({ authority, onSelect }: { authority: Authority; onSelect
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle>{authority.short_name}</CardTitle>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{authority.name}</p>
+            <p className="bw-text-muted mt-1 text-sm">{authority.name}</p>
           </div>
           <Badge className="bg-slate-900/5 text-slate-700 ring-slate-900/10 dark:bg-white/10 dark:text-slate-200 dark:ring-white/10">
             {authority.city}
@@ -1270,7 +1270,7 @@ function AuthorityCard({ authority, onSelect }: { authority: Authority; onSelect
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">{authority.jurisdiction_notes}</p>
+        <p className="bw-text-muted text-sm leading-6">{authority.jurisdiction_notes}</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {authority.tags.slice(0, 3).map((tag) => (
             <Badge key={tag} className="bg-teal-500/10 text-teal-700 ring-teal-500/20 dark:text-teal-200">
@@ -1301,7 +1301,7 @@ function AuthorityCard({ authority, onSelect }: { authority: Authority; onSelect
 function LinkRow({ href, label }: { href?: string | null; label: string }) {
   if (!href) return null;
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-md bg-slate-950/5 px-3 py-2 text-slate-700 hover:bg-teal-500/10 dark:bg-white/5 dark:text-slate-300">
+    <a href={href} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-md bg-slate-100 px-3 py-2 text-slate-800 hover:bg-teal-500/10 dark:bg-white/5 dark:text-slate-300">
       <span>{label}</span>
       <ExternalLink className="size-3.5" />
     </a>
@@ -1311,11 +1311,11 @@ function LinkRow({ href, label }: { href?: string | null; label: string }) {
 function FaqItem({ question, answer }: { question: string; answer: string }) {
   return (
     <details className="group py-4">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-slate-950 dark:text-white">
+      <summary className="bw-text-primary flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold">
         {question}
         <ArrowRight className="size-4 transition group-open:rotate-90" />
       </summary>
-      <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-400">{answer}</p>
+      <p className="bw-text-muted mt-3 text-sm leading-6">{answer}</p>
     </details>
   );
 }
