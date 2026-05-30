@@ -1,57 +1,36 @@
+<h1 align="center">BuildWise AI</h1>
+
+<p align="center">
+  AI-powered construction compliance and building permission intelligence for architects, builders, civil engineers, consultants, and property owners.
+</p>
+
+<p align="center">
+  <a href="https://buildwise-ai-two.vercel.app"><strong>Live Demo</strong></a>
+  |
+  <a href="https://buildwise-ai-75no.onrender.com"><strong>Backend API</strong></a>
+  |
+  <a href="https://buildwise-ai-75no.onrender.com/health"><strong>Health</strong></a>
+  |
+  <a href="https://github.com/gagandeepsingh76/buildwise-ai"><strong>Repository</strong></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=nextdotjs" alt="Next.js" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Supabase-3ecf8e?style=flat-square&logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169e1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+</p>
+
 <p align="center">
   <img
-    src="https://capsule-render.vercel.app/api?type=waving&height=300&color=0:0f172a,45:0f766e,100:f59e0b&text=BuildWise%20AI&fontSize=72&fontColor=ffffff&fontAlignY=38&desc=AI-Powered%20Construction%20Compliance%20%26%20Building%20Permission%20Intelligence%20Platform&descAlignY=58&descSize=18&animation=fadeIn"
-    alt="BuildWise AI animated banner"
+    src="docs/screenshots/buildwise-product-preview.svg"
+    alt="BuildWise AI product screenshot placeholder"
+    width="960"
   />
 </p>
 
-<p align="center">
-  <strong>AI-Powered Construction Compliance & Building Permission Intelligence Platform</strong>
-</p>
-
-<p align="center">
-  <a href="https://buildwise-ai-two.vercel.app">
-    <img src="https://img.shields.io/badge/Live%20Demo-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" />
-  </a>
-  <a href="https://buildwise-ai-75no.onrender.com">
-    <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="Backend API" />
-  </a>
-  <a href="https://buildwise-ai-75no.onrender.com/health">
-    <img src="https://img.shields.io/badge/Health-Online-10b981?style=for-the-badge&logo=render&logoColor=white" alt="Health endpoint" />
-  </a>
-  <a href="https://github.com/gagandeepsingh76/buildwise-ai">
-    <img src="https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub repository" />
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/gagandeepsingh76/buildwise-ai/stargazers">
-    <img src="https://img.shields.io/github/stars/gagandeepsingh76/buildwise-ai?style=social" alt="GitHub stars" />
-  </a>
-  <a href="https://github.com/gagandeepsingh76/buildwise-ai/network/members">
-    <img src="https://img.shields.io/github/forks/gagandeepsingh76/buildwise-ai?style=social" alt="GitHub forks" />
-  </a>
-  <a href="https://github.com/gagandeepsingh76/buildwise-ai/issues">
-    <img src="https://img.shields.io/github/issues/gagandeepsingh76/buildwise-ai?style=flat-square" alt="GitHub issues" />
-  </a>
-  <a href="https://github.com/gagandeepsingh76/buildwise-ai/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/gagandeepsingh76/buildwise-ai?style=flat-square" alt="GitHub license" />
-  </a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Next.js-Frontend-000000?style=flat-square&logo=nextdotjs" alt="Next.js" />
-  <img src="https://img.shields.io/badge/React-UI-61dafb?style=flat-square&logo=react&logoColor=111111" alt="React" />
-  <img src="https://img.shields.io/badge/TypeScript-Strict-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Tailwind%20CSS-Design-06b6d4?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
-  <img src="https://img.shields.io/badge/FastAPI-Backend-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/Supabase-Database-3ecf8e?style=flat-square&logo=supabase&logoColor=white" alt="Supabase" />
-  <img src="https://img.shields.io/badge/PostgreSQL-pgvector-4169e1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL pgvector" />
-</p>
-
 ---
-
-# BuildWise AI
 
 BuildWise AI is a production-grade, authority-aware AI SaaS platform for building permissions, zoning, permits, construction compliance, FAR/FSI, setbacks, occupancy, inspections, and required documents.
 
@@ -800,10 +779,3 @@ Project: [BuildWise AI](https://github.com/gagandeepsingh76/buildwise-ai)
 This project is licensed under the MIT License.
 
 See the `LICENSE` file for details.
-
-<p align="center">
-  <img
-    src="https://capsule-render.vercel.app/api?type=waving&height=140&section=footer&color=0:0f172a,45:0f766e,100:f59e0b"
-    alt="BuildWise AI footer banner"
-  />
-</p>
