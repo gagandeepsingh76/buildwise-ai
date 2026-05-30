@@ -194,7 +194,7 @@ Vercel frontend:
 
 1. Import the repo.
 2. Set root directory to `frontend`.
-3. Add `NEXT_PUBLIC_API_BASE_URL` pointing to Render.
+3. Add `NEXT_PUBLIC_API_BASE_URL=https://buildwise-ai-75no.onrender.com`.
 4. Deploy.
 
 ## Verification

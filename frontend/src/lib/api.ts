@@ -1,9 +1,21 @@
 import type { AskResponse, Authority, DocumentRecord, HistoryItem, Language, SourceReference, WizardContext } from "@/lib/types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const configuredApiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "").trim();
+
+export const API_BASE_URL = configuredApiBaseUrl.replace(/\/+$/, "");
+
+if (!API_BASE_URL) {
+  console.warn(
+    "BuildWise AI API URL is not configured. Set NEXT_PUBLIC_API_BASE_URL or NEXT_PUBLIC_API_URL.",
+  );
+}
+
+function apiUrl(path: string) {
+  return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -63,7 +75,7 @@ export async function sendFeedback(payload: { query_id: string; rating?: number;
 }
 
 export async function uploadDocument(form: FormData, adminKey: string) {
-  const response = await fetch(`${API_BASE_URL}/documents`, {
+  const response = await fetch(apiUrl("/documents"), {
     method: "POST",
     headers: {
       "X-Admin-Api-Key": adminKey,
