@@ -6,6 +6,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import UploadFile
+import structlog
 
 from app.core.config import Settings
 from app.db.supabase import SupabaseRepository
@@ -15,6 +16,9 @@ from app.services.embeddings import EmbeddingService
 from app.services.store import InMemoryStore
 from app.utils.pdf import extract_pdf_pages
 from app.utils.text import chunk_pages
+
+
+logger = structlog.get_logger(__name__)
 
 
 class DocumentService:
@@ -59,6 +63,15 @@ class DocumentService:
 
     async def ingest_pdf(self, file: UploadFile, metadata: DocumentMetadata) -> IngestResponse:
         content = await file.read()
+        logger.info(
+            "document_ingest_started",
+            file_name=file.filename,
+            file_size=len(content),
+            authority_id=metadata.authority_id,
+            document_type=metadata.document_type,
+            city=metadata.city,
+            state=metadata.state,
+        )
         if len(content) > self.settings.max_upload_bytes:
             raise ValueError(f"File exceeds {self.settings.max_upload_mb} MB upload limit.")
         if file.content_type and "pdf" not in file.content_type.lower():
@@ -170,6 +183,13 @@ class DocumentService:
             )
             record = self._document_record_from_local(document)
 
+        logger.info(
+            "document_ingest_completed",
+            document_id=document_id,
+            chunks_indexed=len(chunk_payloads),
+            authority_id=metadata.authority_id,
+            document_type=metadata.document_type,
+        )
         return IngestResponse(
             document=record,
             chunks_indexed=len(chunk_payloads),

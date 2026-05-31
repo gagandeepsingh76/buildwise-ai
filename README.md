@@ -24,7 +24,11 @@
 
 <p align="center">
   <img
-    <img width="960" height="629" alt="image" src="https://github.com/user-attachments/assets/a02be2b2-5e2b-464b-9713-2059ff182b21"   alt="BuildWise AI product screenshot placeholder" />
+    width="960"
+    height="629"
+    alt="BuildWise AI product preview"
+    src="https://github.com/user-attachments/assets/a02be2b2-5e2b-464b-9713-2059ff182b21"
+  />
 </p>
 
 ---
@@ -439,8 +443,9 @@ LLM_MODEL=
 
 | Variable | Description |
 |---|---|
-| `FRONTEND_ORIGINS` | Allowed frontend origins for CORS |
-| `ADMIN_API_KEY` | Admin upload and indexing key |
+| `APP_ENV` | Runtime environment. Set to `production` on Render/Vercel-backed deployments |
+| `FRONTEND_ORIGINS` | Comma-separated allowed frontend origins for CORS. Do not use `*` in production |
+| `ADMIN_API_KEY` | Admin upload and indexing key. Must be replaced with a strong secret before production uploads |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
 | `SUPABASE_STORAGE_BUCKET` | Storage bucket for authority documents |
@@ -656,6 +661,9 @@ BuildWise AI is designed for compliance research workflows, not as a replacement
 Security and compliance posture:
 
 - Admin document upload endpoints require `X-Admin-Api-Key`.
+- Production admin uploads are disabled when `ADMIN_API_KEY` is left as the placeholder value.
+- The frontend does not persist the admin key in browser storage.
+- Backend CORS is restricted to `FRONTEND_ORIGINS`.
 - Supabase service-role credentials are intended for backend-only use.
 - Frontend environment variables are limited to public client-safe values.
 - Retrieval is metadata-filtered by authority, city, state, and document type where available.

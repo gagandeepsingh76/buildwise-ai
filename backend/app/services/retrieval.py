@@ -43,6 +43,11 @@ class RetrievalService:
             )
         )
 
+    @staticmethod
+    def public_sources(sources: list[SourceReference]) -> list[SourceReference]:
+        """Remove internal retrieval metadata before returning source cards to clients."""
+        return [source.model_copy(update={"metadata": {}}) for source in sources]
+
     async def search(self, request: SearchRequest) -> list[SourceReference]:
         query_embedding = await self.embeddings.embed_query(request.query)
         rows = await self.repository.match_chunks(
@@ -55,13 +60,20 @@ class RetrievalService:
             min_similarity=self.settings.rag_min_similarity,
         )
         if rows:
+            retrieval_method = "supabase_vector"
+            lexical_rows: list[dict[str, Any]] = []
+            if self._should_supplement_vector_rows(rows, request):
+                lexical_rows = await self._search_supabase_lexical(request)
+                rows = self._merge_ranked_rows(rows, lexical_rows, request.top_k)
+                retrieval_method = "supabase_vector_plus_lexical"
             logger.info(
                 "retrieval_after_supabase",
-                retrieval_method="supabase_vector",
+                retrieval_method=retrieval_method,
                 retrieved_chunks_count=len(rows),
                 document_ids=sorted({str(row.get("document_id")) for row in rows}),
                 authority_metadata=self._authority_metadata(rows),
                 similarity_scores=[round(float(row.get("similarity") or 0), 4) for row in rows],
+                lexical_supplement_count=len(lexical_rows),
                 filters=self._filters(request),
             )
             return [self._from_db_row(row) for row in rows]
@@ -157,7 +169,7 @@ class RetrievalService:
                     }
                 )
 
-        scored.sort(key=lambda row: row["similarity"], reverse=True)
+        scored.sort(key=self._row_rank_key, reverse=True)
         selected = scored[: request.top_k]
         logger.info(
             "supabase_lexical_fallback_after",
@@ -196,7 +208,7 @@ class RetrievalService:
             )
             if score >= self.settings.rag_min_similarity:
                 scored.append({**chunk, "score": score})
-        scored.sort(key=lambda row: row["score"], reverse=True)
+        scored.sort(key=self._row_rank_key, reverse=True)
         return scored[:top_k]
 
     def _seed_rows(self, authority_id: str | None, city: str | None, state: str | None) -> list[dict[str, Any]]:
@@ -213,12 +225,14 @@ class RetrievalService:
 
     @staticmethod
     def _lexical_score(query: str, content: str) -> float:
-        query_terms = {term for term in re.findall(r"[\w\-]{4,}", RetrievalService._normalize_search_text(query))}
-        content_terms = {term for term in re.findall(r"[\w\-]{4,}", RetrievalService._normalize_search_text(content))}
+        query_terms = RetrievalService._expanded_terms(query)
+        content_terms = RetrievalService._expanded_terms(content)
         if not query_terms or not content_terms:
             return 0.0
         overlap = query_terms.intersection(content_terms)
-        return min(1.0, len(overlap) / max(1, len(query_terms)))
+        base_score = len(overlap) / max(1, len(query_terms))
+        phrase_bonus = RetrievalService._phrase_bonus(query, content)
+        return min(1.0, base_score + phrase_bonus)
 
     @staticmethod
     def _normalize_search_text(text: str) -> str:
@@ -227,7 +241,82 @@ class RetrievalService:
             .replace("roof-top", "roof top")
             .replace("rooftop", "roof top")
             .replace("terrace", "roof")
+            .replace("sanction", "approval")
+            .replace("permission", "approval")
+            .replace("permit", "approval")
+            .replace("certificates", "certificate")
+            .replace("drawings", "drawing")
         )
+
+    @staticmethod
+    def _expanded_terms(text: str) -> set[str]:
+        normalized = RetrievalService._normalize_search_text(text)
+        terms = {term for term in re.findall(r"[\w\-]{4,}", normalized)}
+        aliases = [
+            {"approval", "sanction", "permission", "permit", "license"},
+            {"document", "certificate", "drawing", "affidavit", "ownership"},
+            {"inspection", "completion", "occupancy", "review"},
+            {"setback", "height", "coverage", "floor", "fsi", "far"},
+            {"roof", "terrace", "rooftop", "garden"},
+            {"structural", "safety", "fire", "waterproofing", "drainage"},
+        ]
+        expanded = set(terms)
+        for group in aliases:
+            if terms.intersection(group):
+                expanded.update(group)
+        return expanded
+
+    @staticmethod
+    def _phrase_bonus(query: str, content: str) -> float:
+        normalized_query = RetrievalService._normalize_search_text(query)
+        normalized_content = RetrievalService._normalize_search_text(content)
+        bonus = 0.0
+        for phrase in [
+            "roof garden",
+            "building plan",
+            "structural safety",
+            "occupancy certificate",
+            "completion certificate",
+            "fire safety",
+            "setback",
+            "floor area",
+        ]:
+            if phrase in normalized_query and phrase in normalized_content:
+                bonus += 0.08
+        return min(0.24, bonus)
+
+    @staticmethod
+    def _should_supplement_vector_rows(rows: list[dict[str, Any]], request: SearchRequest) -> bool:
+        if not rows:
+            return False
+        scores = [float(row.get("similarity") or 0) for row in rows]
+        best_score = max(scores) if scores else 0.0
+        enough_coverage = len(rows) >= min(3, request.top_k)
+        return best_score < 0.42 or not enough_coverage
+
+    @classmethod
+    def _merge_ranked_rows(
+        cls,
+        vector_rows: list[dict[str, Any]],
+        lexical_rows: list[dict[str, Any]],
+        top_k: int,
+    ) -> list[dict[str, Any]]:
+        merged: dict[tuple[str, str], dict[str, Any]] = {}
+        for row in [*vector_rows, *lexical_rows]:
+            key = (str(row.get("document_id") or ""), str(row.get("chunk_id") or row.get("id") or row.get("chunk_index") or ""))
+            existing = merged.get(key)
+            if not existing or cls._row_rank_key(row) > cls._row_rank_key(existing):
+                merged[key] = row
+        return sorted(merged.values(), key=cls._row_rank_key, reverse=True)[:top_k]
+
+    @staticmethod
+    def _row_rank_key(row: dict[str, Any]) -> tuple[float, int, float]:
+        metadata = row.get("metadata") or {}
+        source_kind = metadata.get("source_kind") or metadata.get("ingestion_source")
+        uploaded_bonus = 1 if source_kind in {"uploaded_authority_document", "admin_upload"} else 0
+        seed_penalty = -1 if metadata.get("seed") else 0
+        score = float(row.get("similarity") or row.get("score") or 0)
+        return (uploaded_bonus + seed_penalty, 0 if row.get("page_start") is None else 1, score)
 
     def _local_zero_reason(self, request: SearchRequest) -> str:
         if not self.store.chunks:

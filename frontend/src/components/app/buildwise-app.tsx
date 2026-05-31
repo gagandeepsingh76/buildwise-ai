@@ -3,10 +3,12 @@
 import {
   AlertTriangle,
   ArrowRight,
+  Ban,
   Bookmark,
   Building2,
   ChevronDown,
   CheckCircle2,
+  CircleHelp,
   ClipboardCheck,
   Database,
   Download,
@@ -47,7 +49,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { askBuildWise, getAuthorities, getDocuments, getHistory, searchDocuments, sendFeedback, uploadDocument } from "@/lib/api";
 import { t, translations } from "@/lib/i18n";
 import type { AskResponse, Authority, DocumentRecord, HistoryItem, Language, SourceReference, WizardContext } from "@/lib/types";
-import { cn, formatConfidence, truncateMiddle } from "@/lib/utils";
+import { cn, decisionLabel, formatConfidence, formatDecision, formatFileSize, truncateMiddle } from "@/lib/utils";
 
 const NONE = "__none";
 
@@ -227,10 +229,9 @@ export function BuildWiseApp() {
   const [answer, setAnswer] = useState<AskResponse | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
-  const [adminKey, setAdminKey] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return window.localStorage.getItem("buildwise-admin-key") || "";
-  });
+  const [initializing, setInitializing] = useState(true);
+  const [systemNotice, setSystemNotice] = useState<string | null>(null);
+  const [adminKey, setAdminKey] = useState("");
   const [uploading, setUploading] = useState(false);
   const [docSearchQuery, setDocSearchQuery] = useState("roof garden structural approval");
   const [docSearchResults, setDocSearchResults] = useState<SourceReference[]>([]);
@@ -251,6 +252,10 @@ export function BuildWiseApp() {
       if (authorityResult.status === "fulfilled" && authorityResult.value.length) setAuthorities(authorityResult.value);
       if (docsResult.status === "fulfilled") setDocuments(docsResult.value);
       if (historyResult.status === "fulfilled") setHistory(historyResult.value);
+      if ([authorityResult, docsResult, historyResult].some((result) => result.status === "rejected")) {
+        setSystemNotice("Live backend data could not fully load. Showing available local data until the API responds.");
+      }
+      setInitializing(false);
     });
   }, []);
 
@@ -449,6 +454,9 @@ export function BuildWiseApp() {
         top_k: 5,
       });
       setDocSearchResults(response.results);
+      if (!response.results.length) {
+        toast.info("No matching uploaded evidence found for that search.");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Document search failed");
     } finally {
@@ -464,18 +472,26 @@ export function BuildWiseApp() {
       toast.error("Select a PDF");
       return;
     }
+    if (file.type && file.type !== "application/pdf") {
+      toast.error("Only PDF uploads are supported.");
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("PDF must be 25 MB or smaller.");
+      return;
+    }
     if (!adminKey.trim()) {
       toast.error("Admin key required");
       return;
     }
     setUploading(true);
-    window.localStorage.setItem("buildwise-admin-key", adminKey);
     const formData = new FormData(form);
     try {
       const response = await uploadDocument(formData, adminKey);
-      setDocuments((current) => [response.document, ...current]);
-      toast.success(copy("uploadSuccess"));
+      setDocuments((current) => [response.document, ...current.filter((document) => document.id !== response.document.id)]);
+      toast.success(`${copy("uploadSuccess")} ${response.chunks_indexed} chunks indexed.`);
       form.reset();
+      if (fileRef.current) fileRef.current.value = "";
     } catch (error) {
       toast.error(error instanceof Error ? error.message : copy("uploadFailed"));
     } finally {
@@ -484,6 +500,7 @@ export function BuildWiseApp() {
   }
 
   const confidenceValue = answer?.answer.confidence_indicator === "High" ? 88 : answer?.answer.confidence_indicator === "Medium" ? 58 : 24;
+  const DecisionIcon = answer?.answer.is_allowed === "Yes" ? CheckCircle2 : answer?.answer.is_allowed === "No" ? Ban : answer?.answer.is_allowed === "Conditional" ? AlertTriangle : CircleHelp;
   const navItems = [
     { id: "assistant", label: copy("navProduct") },
     { id: "authorities", label: copy("navAuthorities") },
@@ -514,6 +531,14 @@ export function BuildWiseApp() {
       </header>
 
       <main>
+        {systemNotice && (
+          <div className="fixed inset-x-0 top-16 z-30 border-b border-amber-300/60 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 shadow-sm dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
+            <div className="mx-auto flex max-w-7xl items-center gap-2">
+              <AlertTriangle className="size-4 shrink-0" />
+              <span>{systemNotice}</span>
+            </div>
+          </div>
+        )}
         <section id="assistant" className="hero-visual relative pt-24 text-white">
           <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" />
           <div className="relative mx-auto grid min-h-[760px] max-w-7xl gap-8 px-4 pb-20 pt-10 sm:px-6 lg:grid-cols-[0.86fr_1.14fr] lg:px-8">
@@ -605,8 +630,8 @@ export function BuildWiseApp() {
 
         <section className="mesh-band border-y border-slate-200/80 py-10 dark:border-white/10">
           <div className="mx-auto grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-4 lg:px-8">
-            <Metric icon={MapPinned} label="Jurisdictions" value={`${authorities.length}`} />
-            <Metric icon={FileText} label="Indexed docs" value={`${documents.length}`} />
+            <Metric icon={MapPinned} label="Jurisdictions" value={initializing ? "..." : `${authorities.length}`} />
+            <Metric icon={FileText} label="Indexed docs" value={initializing ? "..." : `${documents.length}`} />
             <Metric icon={ShieldCheck} label="Grounding" value="Source-only" />
             <Metric icon={Globe2} label="Languages" value="EN + हिंदी" />
           </div>
@@ -659,27 +684,41 @@ export function BuildWiseApp() {
 
               {!loading && answer && (
                 <div className="space-y-5">
-                  <div className="grid gap-4 md:grid-cols-[1.4fr_.6fr]">
-                    <div className="bw-card rounded-lg p-4">
-                      <p className="bw-text-muted text-xs font-semibold uppercase">{copy("quickSummary")}</p>
-                      <p className="bw-text-primary mt-2 text-base leading-7">{answer.answer.quick_summary}</p>
-                    </div>
-                    <div className="bw-card rounded-lg p-4">
-                      <p className="bw-text-muted text-xs font-semibold uppercase">{copy("isAllowed")}</p>
-                      <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <span className="bw-text-primary text-2xl font-semibold">{answer.answer.is_allowed}</span>
-                        <Badge className={cn("ring-1", formatConfidence(answer.answer.confidence_indicator))}>
-                          {copy("confidence")}: {answer.answer.confidence_indicator}
-                        </Badge>
+                  <div className={cn("rounded-lg border p-4", formatDecision(answer.answer.is_allowed))}>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="flex gap-3">
+                        <span className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-lg bg-white/70 shadow-sm dark:bg-white/10">
+                          <DecisionIcon className="size-5" />
+                        </span>
+                        <div>
+                          <p className="text-xs font-semibold uppercase text-current/70">{copy("isAllowed")}</p>
+                          <h3 className="mt-1 text-2xl font-semibold">{decisionLabel(answer.answer.is_allowed)}</h3>
+                          <p className="mt-2 max-w-3xl text-sm leading-6 text-current/80">{answer.answer.quick_summary}</p>
+                        </div>
                       </div>
-                      <Progress value={confidenceValue} className="mt-4" />
+                      <div className="min-w-48 rounded-lg border border-current/10 bg-white/70 p-3 dark:bg-white/[0.08]">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-xs font-semibold uppercase text-current/70">{copy("confidence")}</span>
+                          <Badge className={cn("ring-1", formatConfidence(answer.answer.confidence_indicator))}>
+                            {answer.answer.confidence_indicator}
+                          </Badge>
+                        </div>
+                        <Progress value={confidenceValue} className="mt-3" />
+                        <p className="mt-2 text-xs leading-5 text-current/70">
+                          {answer.answer.confidence_indicator === "High"
+                            ? "Multiple relevant authority excerpts support this answer."
+                            : answer.answer.confidence_indicator === "Medium"
+                              ? "Some relevant evidence was found; verify plot-specific details."
+                              : "Evidence is limited or the authority context needs confirmation."}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     {answerSections.map((section) => {
                       const Icon = section.icon;
-                      const items = answer.answer[section.key] as string[];
+                      const items = (answer.answer[section.key] as string[]).filter(Boolean);
                       return (
                         <div key={section.key} className="bw-card rounded-lg p-4">
                           <div className="flex items-center gap-2">
@@ -687,7 +726,7 @@ export function BuildWiseApp() {
                             <h3 className="bw-text-primary text-sm font-semibold">{copy(section.label)}</h3>
                           </div>
                           <ul className="bw-text-secondary mt-3 space-y-2 text-sm leading-6">
-                            {items.map((item, index) => (
+                            {(items.length ? items : ["No explicit authority-backed item was returned for this section."]).map((item, index) => (
                               <li key={`${section.key}-${index}`} className="flex gap-2">
                                 <span className="mt-2 size-1.5 shrink-0 rounded-full bg-amber-500" />
                                 <span>{item}</span>
@@ -702,7 +741,7 @@ export function BuildWiseApp() {
                   <div className="bw-card rounded-lg p-4">
                     <h3 className="bw-text-primary text-sm font-semibold">{copy("links")}</h3>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {answer.answer.official_authority_links.map((link) => (
+                      {answer.answer.official_authority_links.length ? answer.answer.official_authority_links.map((link) => (
                         <a
                           key={link}
                           href={link}
@@ -713,7 +752,9 @@ export function BuildWiseApp() {
                           {truncateMiddle(link, 42)}
                           <ExternalLink className="size-3.5" />
                         </a>
-                      ))}
+                      )) : (
+                        <p className="bw-text-muted text-sm">No official link was attached to the retrieved evidence.</p>
+                      )}
                     </div>
                   </div>
 
@@ -753,7 +794,7 @@ export function BuildWiseApp() {
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="bw-text-primary text-xl font-semibold">{copy("sourcesTitle")}</h2>
                 <Badge className="bg-slate-900/5 text-slate-700 ring-slate-900/10 dark:bg-white/10 dark:text-slate-200 dark:ring-white/10">
-                  {answer?.sources.length || 0} sources
+                  {answer?.sources.length || 0} items
                 </Badge>
               </div>
               <div className="grid gap-3">
@@ -762,7 +803,7 @@ export function BuildWiseApp() {
                 ))}
                 {answer && answer.sources.length === 0 && (
                   <p className="bw-text-muted rounded-lg border border-dashed border-slate-300 p-6 text-sm dark:border-white/15">
-                    No source cards were returned because the assistant requested clarification first.
+                    No evidence cards were returned because the assistant needs jurisdiction details first.
                   </p>
                 )}
               </div>
@@ -813,6 +854,12 @@ export function BuildWiseApp() {
                 </Button>
               </form>
               <div className="mt-3 space-y-2">
+                {docSearching && (
+                  <>
+                    <Skeleton className="h-20" />
+                    <Skeleton className="h-20" />
+                  </>
+                )}
                 {docSearchResults.map((result) => (
                   <button
                     key={`${result.document_id}-${result.chunk_id}`}
@@ -824,6 +871,11 @@ export function BuildWiseApp() {
                     {result.excerpt.slice(0, 180)}
                   </button>
                 ))}
+                {!docSearching && docSearchResults.length === 0 && (
+                  <p className="bw-text-muted rounded-lg border border-dashed border-slate-300 p-3 text-sm dark:border-white/15">
+                    Search uploaded PDFs for clauses before asking a report question.
+                  </p>
+                )}
               </div>
             </SidePanel>
 
@@ -899,7 +951,7 @@ export function BuildWiseApp() {
               />
               <FaqItem
                 question="Can admins add a new city?"
-                answer="Yes. Add an authority in the catalog/database, upload official PDFs with metadata, then reindex. Retrieval filters by authority, city, state, document type, and source metadata."
+                answer="Yes. Add an authority in the catalog, upload official PDFs with jurisdiction details, then reindex. Retrieval filters by authority, city, state, and document type."
               />
               <FaqItem
                 question="Which embedding model is used?"
@@ -918,21 +970,42 @@ export function BuildWiseApp() {
               </Badge>
               <h2 className="mt-4 text-3xl font-semibold">Document intelligence console</h2>
               <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                Upload real PDFs, tag jurisdiction metadata, and index chunks into Supabase pgvector. Uploaded authority documents are prioritized over seeded authority profiles.
+                Upload real PDFs, tag jurisdiction details, and index chunks into Supabase pgvector. Uploaded authority documents are prioritized over seeded authority profiles.
               </p>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {initializing && Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24" />)}
                 {documents.slice(0, 4).map((document) => (
                   <div key={document.id} className="bw-card-soft rounded-lg p-3">
                     <p className="text-sm font-semibold">{document.title}</p>
-                    <p className="bw-text-muted mt-1 text-xs">
-                      {document.status} · {document.chunk_count} chunks
-                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Badge className="bg-teal-500/15 text-teal-700 ring-teal-500/20 dark:text-teal-200">
+                        {document.chunk_count} chunks
+                      </Badge>
+                      <Badge className="bg-slate-900/5 text-slate-700 ring-slate-900/10 dark:bg-white/10 dark:text-slate-200">
+                        {document.status}
+                      </Badge>
+                    </div>
+                    <p className="bw-text-muted mt-2 text-xs">{formatFileSize(document.file_size)}</p>
                   </div>
                 ))}
+                {!initializing && documents.length === 0 && (
+                  <p className="bw-text-muted rounded-lg border border-dashed border-slate-300 p-4 text-sm dark:border-white/15 sm:col-span-2">
+                    No uploaded PDFs yet. Add an authority document to enable stronger evidence-backed answers.
+                  </p>
+                )}
               </div>
             </div>
 
             <form onSubmit={handleUpload} className="bw-card rounded-lg p-5 backdrop-blur-xl">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="bw-text-primary text-base font-semibold">Index a new authority PDF</h3>
+                  <p className="bw-text-muted mt-1 text-sm">Add clean jurisdiction details so retrieval can rank this PDF above seeded authority profiles.</p>
+                </div>
+                <Badge className="w-fit bg-amber-500/15 text-amber-700 ring-amber-500/20 dark:text-amber-200">
+                  {uploading ? "Indexing" : "Admin"}
+                </Badge>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Input name="title" placeholder="Document title" required />
                 <Input name="document_type" placeholder="bylaws / permit-manual" required />
@@ -953,9 +1026,11 @@ export function BuildWiseApp() {
                 <Input name="official_url" placeholder="Official URL" className="sm:col-span-2" />
                 <Input name="tags" placeholder="tags, comma, separated" className="sm:col-span-2" />
                 <Input
+                  type="password"
                   value={adminKey}
                   onChange={(event) => setAdminKey(event.target.value)}
                   placeholder="Admin API key"
+                  autoComplete="off"
                   className="sm:col-span-2"
                 />
                 <Input ref={fileRef} name="file" type="file" accept="application/pdf" required className="sm:col-span-2" />
@@ -964,6 +1039,16 @@ export function BuildWiseApp() {
                 {uploading ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
                 {copy("upload")}
               </Button>
+              <div className="mt-4 grid gap-2 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-3">
+                {["Extract PDF text", "Create chunks", "Index embeddings"].map((step, index) => (
+                  <div key={step} className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                    <span className={cn("flex size-5 items-center justify-center rounded-full text-[11px] font-semibold", uploading ? "bg-teal-500 text-white" : "bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-200")}>
+                      {index + 1}
+                    </span>
+                    {step}
+                  </div>
+                ))}
+              </div>
             </form>
           </div>
         </section>
@@ -1201,12 +1286,12 @@ function SourceCard({ source }: { source: AskResponse["sources"][number] }) {
         <div>
           <p className="bw-text-primary font-semibold">{source.document_title}</p>
           <p className="bw-text-muted mt-1 text-sm">
-            {source.authority_name} · {source.city}, {source.state}
-            {source.page_start ? ` · p.${source.page_start}${source.page_end && source.page_end !== source.page_start ? `-${source.page_end}` : ""}` : ""}
+            {source.authority_name} / {source.city}, {source.state}
+            {source.page_start ? ` / p.${source.page_start}${source.page_end && source.page_end !== source.page_start ? `-${source.page_end}` : ""}` : ""}
           </p>
         </div>
         <Badge className="w-fit bg-teal-500/15 text-teal-700 ring-teal-500/20 dark:text-teal-200">
-          {Math.round(source.score * 100)}%
+          Evidence
         </Badge>
       </div>
       <p className="bw-text-secondary mt-3 text-sm leading-6">{source.excerpt}</p>

@@ -9,4 +9,5 @@ router = APIRouter(tags=["search"])
 
 @router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest, services: Services = Depends(get_services)) -> SearchResponse:
-    return SearchResponse(results=await services.retrieval.search(request))
+    results = await services.retrieval.search(request)
+    return SearchResponse(results=services.retrieval.public_sources(results))

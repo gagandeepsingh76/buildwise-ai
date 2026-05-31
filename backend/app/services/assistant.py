@@ -110,6 +110,7 @@ class AssistantService:
             ],
         )
         answer = await self.generation.generate(request.query, request.language.value, detected, jurisdiction, sources)
+        public_sources = self.retrieval.public_sources(sources)
         response = AskResponse(
             query_id=str(uuid4()),
             session_id=session_id,
@@ -119,7 +120,7 @@ class AssistantService:
             jurisdiction=jurisdiction,
             detected=detected,
             answer=answer,
-            sources=sources,
+            sources=public_sources,
             suggested_questions=self._suggested_questions(request.language, jurisdiction),
         )
         await self._save_query(request, response)

@@ -3,6 +3,7 @@ import type { AskResponse, Authority, DocumentRecord, HistoryItem, Language, Sou
 const configuredApiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "").trim();
 
 export const API_BASE_URL = configuredApiBaseUrl.replace(/\/+$/, "");
+const REQUEST_TIMEOUT_MS = 45000;
 
 if (!API_BASE_URL) {
   console.warn(
@@ -14,19 +15,84 @@ function apiUrl(path: string) {
   return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(apiUrl(path), {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-  });
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed: ${response.status}`);
+export class BuildWiseApiError extends Error {
+  status?: number;
+  code?: string;
+  details?: unknown;
+
+  constructor(message: string, options?: { status?: number; code?: string; details?: unknown }) {
+    super(message);
+    this.name = "BuildWiseApiError";
+    this.status = options?.status;
+    this.code = options?.code;
+    this.details = options?.details;
   }
-  return response.json() as Promise<T>;
+}
+
+function assertApiConfigured() {
+  if (!API_BASE_URL) {
+    throw new BuildWiseApiError("The BuildWise API URL is not configured. Set NEXT_PUBLIC_API_BASE_URL in Vercel.");
+  }
+}
+
+function timeoutSignal(timeoutMs = REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  return { signal: controller.signal, cancel: () => window.clearTimeout(timeout) };
+}
+
+async function readErrorMessage(response: Response) {
+  const fallback = `The API returned ${response.status}. Please try again.`;
+  const contentType = response.headers.get("content-type") || "";
+  try {
+    if (contentType.includes("application/json")) {
+      const payload = (await response.json()) as { message?: string; detail?: string; error?: string; details?: unknown };
+      return {
+        message: payload.message || payload.detail || fallback,
+        code: payload.error,
+        details: payload.details,
+      };
+    }
+    const text = await response.text();
+    return { message: text || fallback };
+  } catch {
+    return { message: fallback };
+  }
+}
+
+function normalizeNetworkError(error: unknown) {
+  if (error instanceof BuildWiseApiError) return error;
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return new BuildWiseApiError("The compliance API timed out. Please retry in a moment.");
+  }
+  if (error instanceof TypeError) {
+    return new BuildWiseApiError("Unable to reach the compliance API. Check the backend URL, CORS settings, or Render service status.");
+  }
+  return error instanceof Error ? error : new BuildWiseApiError("BuildWise AI could not complete the request.");
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  assertApiConfigured();
+  const timeout = timeoutSignal();
+  try {
+    const response = await fetch(apiUrl(path), {
+      ...init,
+      signal: init?.signal || timeout.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers || {}),
+      },
+    });
+    if (!response.ok) {
+      const { message, code, details } = await readErrorMessage(response);
+      throw new BuildWiseApiError(message, { status: response.status, code, details });
+    }
+    return response.json() as Promise<T>;
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  } finally {
+    timeout.cancel();
+  }
 }
 
 export async function askBuildWise(payload: {
@@ -75,16 +141,25 @@ export async function sendFeedback(payload: { query_id: string; rating?: number;
 }
 
 export async function uploadDocument(form: FormData, adminKey: string) {
-  const response = await fetch(apiUrl("/documents"), {
-    method: "POST",
-    headers: {
-      "X-Admin-Api-Key": adminKey,
-    },
-    body: form,
-  });
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Upload failed: ${response.status}`);
+  assertApiConfigured();
+  const timeout = timeoutSignal(90000);
+  try {
+    const response = await fetch(apiUrl("/documents"), {
+      method: "POST",
+      signal: timeout.signal,
+      headers: {
+        "X-Admin-Api-Key": adminKey,
+      },
+      body: form,
+    });
+    if (!response.ok) {
+      const { message, code, details } = await readErrorMessage(response);
+      throw new BuildWiseApiError(message, { status: response.status, code, details });
+    }
+    return response.json() as Promise<{ chunks_indexed: number; document: DocumentRecord; message: string }>;
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  } finally {
+    timeout.cancel();
   }
-  return response.json() as Promise<{ chunks_indexed: number; document: DocumentRecord; message: string }>;
 }

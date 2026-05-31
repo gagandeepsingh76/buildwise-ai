@@ -37,6 +37,14 @@ ANSWER_SCHEMA_KEYS = [
     "assumptions_uncertainty_notes",
 ]
 
+SECTION_KEYWORDS = {
+    "required_approvals": ["approval", "permission", "sanction", "permit", "license"],
+    "required_documents": ["document", "certificate", "drawing", "form", "affidavit", "ownership"],
+    "relevant_restrictions": ["shall not", "prohibited", "restriction", "not permitted", "condition"],
+    "far_height_setback_notes": ["far", "fsi", "height", "setback", "coverage", "floor area"],
+    "inspection_requirements": ["inspection", "completion", "occupancy certificate", "fire", "structural"],
+}
+
 
 class GroundedGenerationService:
     def __init__(self, settings: Settings) -> None:
@@ -133,11 +141,11 @@ class GroundedGenerationService:
         sources: list[SourceReference],
     ) -> str:
         source_text = "\n\n".join(
-            f"[{idx}] {source.document_title} | {source.authority_name} | pages {source.page_start or 'n/a'}-{source.page_end or 'n/a'} | score {source.score}\n{source.excerpt}"
+            f"Source {idx}: {source.authority_name} | pages {source.page_start or 'n/a'}-{source.page_end or 'n/a'}\n{source.excerpt}"
             for idx, source in enumerate(sources, start=1)
         )
         return f"""
-Answer the user only from the retrieved context. Do not invent regulations, numeric FAR/FSI, setbacks, heights, fees, or procedures. If exact rules are unavailable, say so clearly and recommend verifying with the official authority.
+Answer the user only from the retrieved context. Write like a professional permit consultant preparing a concise compliance note. Do not invent regulations, numeric FAR/FSI, setbacks, heights, fees, or procedures. If exact rules are unavailable, say so clearly and recommend verifying with the official authority.
 
 Language: {"Hindi" if language == "hi" else "English"}
 User query: {query}
@@ -155,6 +163,9 @@ Rules:
 - confidence_indicator must be High, Medium, or Low.
 - official_authority_links must contain only URLs present in the jurisdiction or sources.
 - assumptions_uncertainty_notes must separate missing evidence from factual context.
+- Never mention chunk IDs, document IDs, file names, metadata, vector search, similarity scores, retrieval methods, database rows, or internal source numbers.
+- Prefer actionable guidance: approvals, documents, restrictions, inspections, risks, and next steps.
+- If source evidence exists for a section, include the useful guidance instead of leaving that section empty.
 """.strip()
 
     @staticmethod
@@ -179,15 +190,27 @@ Rules:
         language: str,
     ) -> dict[str, Any]:
         official_links = self._official_links(jurisdiction, sources)
+        actual_sources = [source for source in sources if not source.metadata.get("seed")]
+        relevant_sentences = self._relevant_sentences("", actual_sources)
         sanitized: dict[str, Any] = {}
         for key in ANSWER_SCHEMA_KEYS:
             value = payload.get(key)
             if key in {"quick_summary", "applicable_authority", "is_allowed", "confidence_indicator"}:
-                sanitized[key] = value or self._fallback_text(key, language, jurisdiction)
+                sanitized[key] = self._clean_user_text(str(value or self._fallback_text(key, language, jurisdiction)))
             elif key == "official_authority_links":
-                sanitized[key] = [link for link in (value or []) if link in official_links] or official_links
+                candidate_links = value if isinstance(value, list) else []
+                sanitized[key] = [link for link in candidate_links if link in official_links] or official_links
             else:
-                sanitized[key] = value if isinstance(value, list) else []
+                items = [self._clean_user_text(str(item)) for item in value] if isinstance(value, list) else []
+                items = [item for item in items if item]
+                if key in SECTION_KEYWORDS and not items and actual_sources:
+                    items = self._bucket_with_context(
+                        relevant_sentences,
+                        SECTION_KEYWORDS[key],
+                        actual_sources,
+                        self._section_label(key),
+                    )
+                sanitized[key] = items
         sanitized["is_allowed"] = sanitized["is_allowed"] if sanitized["is_allowed"] in {"Yes", "Conditional", "No", "Unknown"} else "Unknown"
         sanitized["confidence_indicator"] = (
             sanitized["confidence_indicator"]
@@ -195,11 +218,18 @@ Rules:
             else self._confidence(sources).value
         )
         zero_reason = self._retrieval_zero_reason(sources)
-        actual_sources = [source for source in sources if not source.metadata.get("seed")]
         if zero_reason and not actual_sources:
-            note = f"No uploaded authority chunks were retrieved. Retrieval reason: {zero_reason}"
+            note = "I did not find matching uploaded authority rule text for this question, so the decision remains unconfirmed."
             if note not in sanitized["assumptions_uncertainty_notes"]:
                 sanitized["assumptions_uncertainty_notes"].append(note)
+        sanitized["quick_summary"] = self._consultant_summary_if_needed(
+            sanitized["quick_summary"],
+            sanitized["is_allowed"],
+            jurisdiction,
+            actual_sources,
+            relevant_sentences,
+            language,
+        )
         return sanitized
 
     def _local_answer(
@@ -257,15 +287,23 @@ Rules:
                 "I cannot confirm whether it is allowed without the relevant authority document."
             )
             missing_note = (
-                f"No uploaded authority chunks were retrieved. Retrieval reason: {zero_reason}"
+                "I did not find matching uploaded authority rule text for this question, so the decision remains unconfirmed."
                 if zero_reason
                 else "Exact rule text is unavailable because the relevant official PDF/bylaw/circular has not been uploaded and indexed."
             )
         else:
             summary_context = self._summary_context(actual_sources, relevant_sentences)
+            project_label = self._project_label(query, detected, relevant_sentences)
+            decision_phrase = {
+                "Yes": "appears allowed based on the retrieved authority text",
+                "Conditional": "appears possible only after the required approvals and technical checks",
+                "No": "appears not allowed based on the retrieved authority text",
+                "Unknown": "cannot be confirmed from the retrieved authority text",
+            }.get(is_allowed, "cannot be confirmed from the retrieved authority text")
             summary = (
-                f"Retrieved source context from {actual_sources[0].document_title}: {summary_context} "
-                "Any rule not visible in the sources is treated as uncertain."
+                f"For this {project_label}, the request {decision_phrase}. "
+                f"Key source-backed guidance: {summary_context} "
+                "Items not stated in the authority text should be verified before filing or construction."
             )
             missing_note = "Where the retrieved excerpts do not state a requirement directly, the item remains uncertain."
 
@@ -273,23 +311,33 @@ Rules:
             quick_summary=summary,
             is_allowed=is_allowed,
             applicable_authority=authority_name,
-            required_approvals=self._bucket(relevant_sentences, ["approval", "permission", "sanction", "permit", "license"]),
+            required_approvals=self._bucket_with_context(
+                relevant_sentences,
+                SECTION_KEYWORDS["required_approvals"],
+                actual_sources,
+                "approval",
+            ),
             required_documents=self._bucket_with_context(
                 relevant_sentences,
-                ["document", "certificate", "drawing", "form", "affidavit", "ownership"],
+                SECTION_KEYWORDS["required_documents"],
                 actual_sources,
                 "required documents",
             ),
             relevant_restrictions=self._bucket_with_context(
                 relevant_sentences,
-                ["shall not", "prohibited", "restriction", "not permitted", "condition"],
+                SECTION_KEYWORDS["relevant_restrictions"],
                 actual_sources,
                 "restriction",
             ),
-            far_height_setback_notes=self._bucket(relevant_sentences, ["far", "fsi", "height", "setback", "coverage", "floor area"]),
+            far_height_setback_notes=self._bucket_with_context(
+                relevant_sentences,
+                SECTION_KEYWORDS["far_height_setback_notes"],
+                actual_sources,
+                "FAR, height, setback, or coverage",
+            ),
             inspection_requirements=self._bucket_with_context(
                 relevant_sentences,
-                ["inspection", "completion", "occupancy certificate", "fire", "structural"],
+                SECTION_KEYWORDS["inspection_requirements"],
                 actual_sources,
                 "inspection",
             ),
@@ -339,7 +387,7 @@ Rules:
             for sentence in split_sentences(source.excerpt):
                 lower = sentence.lower()
                 score = sum(1 for term in query_terms if term in lower)
-                if any(keyword in lower for keyword in ["approval", "permission", "document", "setback", "far", "fsi", "height", "inspection", "occupancy", "fire", "structural"]):
+                if any(keyword in lower for keyword in ["approval", "permission", "sanction", "permit", "document", "certificate", "drawing", "setback", "far", "fsi", "height", "inspection", "occupancy", "fire", "structural", "waterproofing", "drainage", "restriction", "shall not"]):
                     score += 2
                 if score:
                     sentences.append((score, sentence))
@@ -355,10 +403,12 @@ Rules:
         if not sources or not sentences:
             return "Unknown"
         text = " ".join(sentences).lower()
-        if any(term in text for term in ["not permitted", "prohibited", "shall not", "not allowed"]):
+        if any(term in text for term in ["not permitted", "prohibited", "not allowed"]):
             return "No"
         if any(term in text for term in ["subject to", "provided that", "approval", "permission", "sanction", "condition"]):
             return "Conditional"
+        if "shall not" in text:
+            return "No"
         if any(term in text for term in ["permitted", "allowed", "may be"]):
             return "Yes"
         return "Unknown"
@@ -380,8 +430,8 @@ Rules:
             return bucket[:4]
         context = GroundedGenerationService._summary_context(sources, sentences)
         if context:
-            return [f"No explicit {section_label} clause was isolated; retrieved context: {context}"]
-        return ["No explicit source-backed item was retrieved for this section."]
+            return [f"The retrieved authority text did not isolate a separate {section_label} clause, but it does state: {context}"]
+        return ["The retrieved authority text does not state a separate requirement for this section."]
 
     @staticmethod
     def _summary_context(sources: list[SourceReference], sentences: list[str]) -> str:
@@ -402,6 +452,71 @@ Rules:
             if reason:
                 return str(reason)
         return None
+
+    @staticmethod
+    def _project_label(query: str, detected: DetectionResult, sentences: list[str]) -> str:
+        text = " ".join([query, *sentences]).lower()
+        if "roof top garden" in text:
+            return "roof top garden"
+        if "roof garden" in text:
+            return "roof garden"
+        if detected.project_type:
+            return detected.project_type.replace("-", " ")
+        return "project"
+
+    @staticmethod
+    def _clean_user_text(value: str) -> str:
+        cleaned = re.sub(
+            r"\b(chunk|document|authority)[-_ ]?id\b\s*[:=]?\s*[\w-]*",
+            "",
+            value,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(
+            r"\b(vector search|similarity score|metadata|database row|retrieval method|chunk metadata)\b",
+            "source review",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" -:\n\t")
+        return cleaned
+
+    @staticmethod
+    def _section_label(key: str) -> str:
+        return {
+            "required_approvals": "approval",
+            "required_documents": "document",
+            "relevant_restrictions": "restriction",
+            "far_height_setback_notes": "FAR, height, setback, or coverage",
+            "inspection_requirements": "inspection",
+        }.get(key, "requirement")
+
+    def _consultant_summary_if_needed(
+        self,
+        summary: str,
+        is_allowed: str,
+        jurisdiction: Authority | None,
+        sources: list[SourceReference],
+        sentences: list[str],
+        language: str,
+    ) -> str:
+        if language == "hi" or not sources:
+            return summary
+        lower = summary.lower()
+        if not any(term in lower for term in ["metadata", "document id", "chunk", "vector", "retrieved source context"]):
+            return summary
+        authority_name = jurisdiction.name if jurisdiction else "the applicable authority"
+        context = self._summary_context(sources, sentences)
+        decision_phrase = {
+            "Yes": "appears allowed",
+            "Conditional": "appears conditional",
+            "No": "appears not allowed",
+            "Unknown": "cannot be confirmed",
+        }.get(is_allowed, "cannot be confirmed")
+        return (
+            f"Based on the retrieved authority text for {authority_name}, the request {decision_phrase}. "
+            f"Key guidance: {context or 'the relevant authority text should be reviewed before proceeding.'}"
+        )
 
     @staticmethod
     def _bucket_hindi(sentences: list[str], keywords: list[str]) -> list[str]:

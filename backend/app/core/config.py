@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
 
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.lower() in {"production", "prod"}
+
+    @property
+    def admin_api_key_is_unsafe(self) -> bool:
+        return self.admin_api_key.strip() in {"", "change-this-before-production"} or len(self.admin_api_key) < 16
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from secrets import compare_digest
 
 from fastapi import Header, HTTPException, status
 
@@ -59,5 +60,10 @@ def get_services() -> Services:
 
 def require_admin(x_admin_api_key: str | None = Header(default=None)) -> None:
     settings = get_settings()
-    if not x_admin_api_key or x_admin_api_key != settings.admin_api_key:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin API key is required.")
+    if settings.is_production and settings.admin_api_key_is_unsafe:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin uploads are disabled until a secure ADMIN_API_KEY is configured.",
+        )
+    if not x_admin_api_key or not compare_digest(x_admin_api_key, settings.admin_api_key):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="A valid admin API key is required.")
