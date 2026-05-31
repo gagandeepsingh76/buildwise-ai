@@ -140,7 +140,7 @@ export async function sendFeedback(payload: { query_id: string; rating?: number;
   });
 }
 
-export async function uploadDocument(form: FormData, adminKey: string) {
+export async function uploadDocument(form: FormData, adminPassword: string) {
   assertApiConfigured();
   const timeout = timeoutSignal(90000);
   try {
@@ -148,7 +148,7 @@ export async function uploadDocument(form: FormData, adminKey: string) {
       method: "POST",
       signal: timeout.signal,
       headers: {
-        "X-Admin-Api-Key": adminKey,
+        "X-Admin-Api-Key": adminPassword,
       },
       body: form,
     });
@@ -164,8 +164,8 @@ export async function uploadDocument(form: FormData, adminKey: string) {
   }
 }
 
-function adminHeaders(adminKey: string) {
-  return { "X-Admin-Api-Key": adminKey };
+function adminHeaders(adminPassword: string) {
+  return { "X-Admin-Api-Key": adminPassword };
 }
 
 function adminDocumentQuery(filters?: {
@@ -182,7 +182,7 @@ function adminDocumentQuery(filters?: {
   return query ? `?${query}` : "";
 }
 
-export async function getAdminDocuments(adminKey: string, filters?: {
+export async function getAdminDocuments(adminPassword: string, filters?: {
   search?: string;
   authority_id?: string;
   document_type?: string;
@@ -190,45 +190,45 @@ export async function getAdminDocuments(adminKey: string, filters?: {
 }) {
   return request<DocumentRecord[]>(`/admin/documents${adminDocumentQuery(filters)}`, {
     cache: "no-store",
-    headers: adminHeaders(adminKey),
+    headers: adminHeaders(adminPassword),
   });
 }
 
-export async function getAdminDocument(documentId: string, adminKey: string) {
+export async function getAdminDocument(documentId: string, adminPassword: string) {
   return request<AdminDocumentDetail>(`/admin/documents/${documentId}`, {
     cache: "no-store",
-    headers: adminHeaders(adminKey),
+    headers: adminHeaders(adminPassword),
   });
 }
 
-export async function deleteAdminDocument(documentId: string, adminKey: string) {
+export async function deleteAdminDocument(documentId: string, adminPassword: string) {
   return request<{ document_id: string; chunks_deleted: number; file_deleted: boolean; message: string }>(
     `/admin/documents/${documentId}`,
     {
       method: "DELETE",
-      headers: adminHeaders(adminKey),
+      headers: adminHeaders(adminPassword),
     },
   );
 }
 
-export async function reindexAdminDocument(documentId: string, adminKey: string) {
+export async function reindexAdminDocument(documentId: string, adminPassword: string) {
   return request<{ document: DocumentRecord; chunks_indexed: number; message: string }>(
     `/admin/documents/${documentId}/reindex`,
     {
       method: "POST",
-      headers: adminHeaders(adminKey),
+      headers: adminHeaders(adminPassword),
     },
   );
 }
 
-export async function getAdminDocumentFile(documentId: string, adminKey: string) {
+export async function getAdminDocumentFile(documentId: string, adminPassword: string) {
   assertApiConfigured();
   const timeout = timeoutSignal(90000);
   try {
     const response = await fetch(apiUrl(`/admin/documents/${documentId}/file`), {
       cache: "no-store",
       signal: timeout.signal,
-      headers: adminHeaders(adminKey),
+      headers: adminHeaders(adminPassword),
     });
     if (!response.ok) {
       const { message, code, details } = await readErrorMessage(response);

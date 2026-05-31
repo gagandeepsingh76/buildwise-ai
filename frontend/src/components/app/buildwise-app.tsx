@@ -53,6 +53,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   askBuildWise,
+  BuildWiseApiError,
   deleteAdminDocument,
   getAdminDocument,
   getAdminDocumentFile,
@@ -70,6 +71,12 @@ import type { AdminDocumentDetail, AskResponse, Authority, DocumentRecord, Histo
 import { cn, decisionLabel, formatConfidence, formatDate, formatDecision, formatFileSize, truncateMiddle } from "@/lib/utils";
 
 const NONE = "__none";
+const ADMIN_PASSWORD_SESSION_KEY = "buildwise-admin-password";
+
+type PendingAdminAction = {
+  run: (adminPassword: string) => Promise<void>;
+  fallback: string;
+};
 
 const fallbackAuthorities: Authority[] = [
   {
@@ -249,7 +256,14 @@ export function BuildWiseApp() {
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [systemNotice, setSystemNotice] = useState<string | null>(null);
-  const [adminKey, setAdminKey] = useState("");
+  const [adminPassword, setAdminPassword] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY) || "";
+  });
+  const [adminPasswordInput, setAdminPasswordInput] = useState("");
+  const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
+  const [adminAuthSubmitting, setAdminAuthSubmitting] = useState(false);
+  const [pendingAdminAction, setPendingAdminAction] = useState<PendingAdminAction | null>(null);
   const [uploading, setUploading] = useState(false);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [documentSearch, setDocumentSearch] = useState("");
@@ -545,33 +559,106 @@ export function BuildWiseApp() {
       toast.error("PDF must be 25 MB or smaller.");
       return;
     }
-    if (!adminKey.trim()) {
-      toast.error("Admin key required");
-      return;
-    }
-    setUploading(true);
     const formData = new FormData(form);
+    await runProtectedAdminAction((password) => uploadDocumentWithPassword(formData, password, form), copy("uploadFailed"));
+  }
+
+  async function uploadDocumentWithPassword(formData: FormData, password: string, form: HTMLFormElement) {
+    setUploading(true);
     try {
-      const response = await uploadDocument(formData, adminKey);
+      const response = await uploadDocument(formData, password);
       setDocuments((current) => [response.document, ...current.filter((document) => document.id !== response.document.id)]);
       toast.success(`${copy("uploadSuccess")} ${response.chunks_indexed} chunks indexed.`);
       form.reset();
       if (fileRef.current) fileRef.current.value = "";
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : copy("uploadFailed"));
     } finally {
       setUploading(false);
     }
   }
 
-  async function refreshAdminDocuments() {
-    if (!adminKey.trim()) {
-      toast.error("Admin key required");
+  function rememberAdminPassword(password: string) {
+    setAdminPassword(password);
+    window.sessionStorage.setItem(ADMIN_PASSWORD_SESSION_KEY, password);
+  }
+
+  function forgetAdminPassword() {
+    setAdminPassword("");
+    window.sessionStorage.removeItem(ADMIN_PASSWORD_SESSION_KEY);
+  }
+
+  function isInvalidAdminPassword(error: unknown) {
+    return error instanceof BuildWiseApiError && error.status === 401;
+  }
+
+  function adminActionErrorMessage(error: unknown, fallback = "Administrator action failed.") {
+    if (isInvalidAdminPassword(error)) return "Invalid administrator password";
+    if (error instanceof BuildWiseApiError && error.status === 503) return "Administrator access is not configured.";
+    if (error instanceof Error && !/api key|x-admin|admin_api_key/i.test(error.message)) return error.message;
+    return fallback;
+  }
+
+  function openAdminVerification(run: (password: string) => Promise<void>, fallback: string, error: string | null = null) {
+    setPendingAdminAction({ run, fallback });
+    setAdminPasswordInput("");
+    setAdminAuthError(error);
+  }
+
+  async function runProtectedAdminAction(run: (password: string) => Promise<void>, fallback = "Administrator action failed.") {
+    const sessionPassword = adminPassword || window.sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY) || "";
+    if (!sessionPassword) {
+      openAdminVerification(run, fallback);
       return;
     }
+
+    try {
+      await run(sessionPassword);
+      rememberAdminPassword(sessionPassword);
+    } catch (error) {
+      if (isInvalidAdminPassword(error)) {
+        forgetAdminPassword();
+        openAdminVerification(run, fallback, "Invalid administrator password");
+      } else {
+        toast.error(adminActionErrorMessage(error, fallback));
+      }
+    }
+  }
+
+  async function handleAdminVerification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pendingAdminAction) return;
+    const password = adminPasswordInput.trim();
+    if (!password) {
+      setAdminAuthError("Admin Password required");
+      return;
+    }
+
+    setAdminAuthSubmitting(true);
+    setAdminAuthError(null);
+    try {
+      await pendingAdminAction.run(password);
+      rememberAdminPassword(password);
+      setPendingAdminAction(null);
+      setAdminPasswordInput("");
+    } catch (error) {
+      if (isInvalidAdminPassword(error)) {
+        forgetAdminPassword();
+        setAdminAuthError("Invalid administrator password");
+      } else {
+        setAdminAuthError(adminActionErrorMessage(error, pendingAdminAction.fallback));
+      }
+    } finally {
+      setAdminAuthSubmitting(false);
+    }
+  }
+
+  async function refreshAdminDocuments() {
+    await runProtectedAdminAction((password) => refreshAdminDocumentsWithPassword(password), "Could not load admin documents.");
+  }
+
+  async function refreshAdminDocumentsWithPassword(password: string) {
     setDocumentsLoading(true);
     try {
-      const response = await getAdminDocuments(adminKey, {
+      const response = await getAdminDocuments(password, {
         search: documentSearch || undefined,
         authority_id: documentAuthorityFilter === NONE ? undefined : documentAuthorityFilter,
         document_type: documentTypeFilter === NONE ? undefined : documentTypeFilter,
@@ -580,64 +667,56 @@ export function BuildWiseApp() {
       setDocuments(response);
       setSelectedDocumentIds((current) => current.filter((id) => response.some((document) => document.id === id)));
       toast.success("Documents refreshed");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load admin documents.");
     } finally {
       setDocumentsLoading(false);
     }
   }
 
   async function openDocumentDetail(documentId: string) {
-    if (!adminKey.trim()) {
-      toast.error("Admin key required to view chunks.");
-      return;
-    }
+    await runProtectedAdminAction((password) => openDocumentDetailWithPassword(documentId, password), "Could not load document details.");
+  }
+
+  async function openDocumentDetailWithPassword(documentId: string, password: string) {
     setDocumentDetailLoading(true);
     try {
-      const detail = await getAdminDocument(documentId, adminKey);
+      const detail = await getAdminDocument(documentId, password);
       setDocumentDetail(detail);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load document details.");
     } finally {
       setDocumentDetailLoading(false);
     }
   }
 
   async function openPdfPreview(document: DocumentRecord) {
-    if (!adminKey.trim()) {
-      toast.error("Admin key required to preview PDFs.");
-      return;
-    }
+    await runProtectedAdminAction((password) => openPdfPreviewWithPassword(document, password), "Could not preview the original PDF.");
+  }
+
+  async function openPdfPreviewWithPassword(document: DocumentRecord, password: string) {
     setPreviewDocument(document);
     setPreviewLoading(true);
     try {
-      const blob = await getAdminDocumentFile(document.id, adminKey);
+      const blob = await getAdminDocumentFile(document.id, password);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(blob));
     } catch (error) {
       setPreviewDocument(null);
-      toast.error(error instanceof Error ? error.message : "Could not preview the original PDF.");
+      throw error;
     } finally {
       setPreviewLoading(false);
     }
   }
 
   async function downloadOriginalPdf(document: DocumentRecord) {
-    if (!adminKey.trim()) {
-      toast.error("Admin key required to download PDFs.");
-      return;
-    }
-    try {
-      const blob = await getAdminDocumentFile(document.id, adminKey);
-      const url = URL.createObjectURL(blob);
-      const anchor = window.document.createElement("a");
-      anchor.href = url;
-      anchor.download = document.file_name || `${document.title}.pdf`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not download the original PDF.");
-    }
+    await runProtectedAdminAction((password) => downloadOriginalPdfWithPassword(document, password), "Could not download the original PDF.");
+  }
+
+  async function downloadOriginalPdfWithPassword(document: DocumentRecord, password: string) {
+    const blob = await getAdminDocumentFile(document.id, password);
+    const url = URL.createObjectURL(blob);
+    const anchor = window.document.createElement("a");
+    anchor.href = url;
+    anchor.download = document.file_name || `${document.title}.pdf`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   function toggleDocumentSelection(documentId: string) {
@@ -653,47 +732,43 @@ export function BuildWiseApp() {
   }
 
   async function confirmDeleteDocuments() {
-    if (!adminKey.trim()) {
-      toast.error("Admin key required");
-      return;
-    }
     const ids = deleteCandidateIds;
     if (!ids.length) return;
+    await runProtectedAdminAction((password) => deleteDocumentsWithPassword(ids, password), "Delete failed.");
+  }
+
+  async function deleteDocumentsWithPassword(ids: string[], password: string) {
     setDocumentActionLoading("delete");
     try {
-      await Promise.all(ids.map((documentId) => deleteAdminDocument(documentId, adminKey)));
+      await Promise.all(ids.map((documentId) => deleteAdminDocument(documentId, password)));
       setDocuments((current) => current.filter((document) => !ids.includes(document.id)));
       setSelectedDocumentIds((current) => current.filter((documentId) => !ids.includes(documentId)));
       if (documentDetail && ids.includes(documentDetail.document.id)) setDocumentDetail(null);
       setDeleteCandidateIds([]);
       toast.success(ids.length === 1 ? "Document deleted" : `${ids.length} documents deleted`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Delete failed.");
     } finally {
       setDocumentActionLoading(null);
     }
   }
 
   async function reindexDocuments(documentIds: string[]) {
-    if (!adminKey.trim()) {
-      toast.error("Admin key required");
-      return;
-    }
     if (!documentIds.length) return;
+    await runProtectedAdminAction((password) => reindexDocumentsWithPassword(documentIds, password), "Reindex failed.");
+  }
+
+  async function reindexDocumentsWithPassword(documentIds: string[], password: string) {
     setDocumentActionLoading("reindex");
     try {
-      const responses = await Promise.all(documentIds.map((documentId) => reindexAdminDocument(documentId, adminKey)));
+      const responses = await Promise.all(documentIds.map((documentId) => reindexAdminDocument(documentId, password)));
       const updatedDocuments = responses.map((response) => response.document);
       setDocuments((current) =>
         current.map((document) => updatedDocuments.find((updated) => updated.id === document.id) || document),
       );
       if (documentDetail) {
         const updated = updatedDocuments.find((document) => document.id === documentDetail.document.id);
-        if (updated) void openDocumentDetail(updated.id);
+        if (updated) void openDocumentDetailWithPassword(updated.id, password);
       }
       toast.success(documentIds.length === 1 ? "Document reindexed" : `${documentIds.length} documents reindexed`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Reindex failed.");
     } finally {
       setDocumentActionLoading(null);
     }
@@ -1225,14 +1300,6 @@ export function BuildWiseApp() {
                 <Input name="state" placeholder="State" required defaultValue="Uttar Pradesh" />
                 <Input name="official_url" placeholder="Official URL" className="sm:col-span-2" />
                 <Input name="tags" placeholder="tags, comma, separated" className="sm:col-span-2" />
-                <Input
-                  type="password"
-                  value={adminKey}
-                  onChange={(event) => setAdminKey(event.target.value)}
-                  placeholder="Admin API key"
-                  autoComplete="off"
-                  className="sm:col-span-2"
-                />
                 <Input ref={fileRef} name="file" type="file" accept="application/pdf" required className="sm:col-span-2" />
               </div>
               <Button type="submit" variant="premium" size="lg" className="mt-4 w-full" disabled={uploading}>
@@ -1418,6 +1485,70 @@ export function BuildWiseApp() {
             <Eye className="size-4" />
             {copy("viewResult")}
           </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {pendingAdminAction && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.form
+              onSubmit={handleAdminVerification}
+              initial={{ y: 18, scale: 0.98 }}
+              animate={{ y: 0, scale: 1 }}
+              exit={{ y: 12, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-slate-950"
+            >
+              <div>
+                <h3 className="bw-text-primary text-lg font-semibold">🔒 Administrator Verification</h3>
+                <p className="bw-text-muted mt-2 text-sm leading-6">
+                  This action requires administrator authorization.
+                </p>
+              </div>
+              <label className="mt-5 block">
+                <FieldLabel>Admin Password</FieldLabel>
+                <Input
+                  type="password"
+                  value={adminPasswordInput}
+                  onChange={(event) => {
+                    setAdminPasswordInput(event.target.value);
+                    setAdminAuthError(null);
+                  }}
+                  placeholder="Admin Password"
+                  autoComplete="off"
+                  autoFocus
+                />
+              </label>
+              {adminAuthError && (
+                <p className="mt-3 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-200">
+                  {adminAuthError}
+                </p>
+              )}
+              <div className="mt-5 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setPendingAdminAction(null);
+                    setAdminAuthError(null);
+                    setAdminPasswordInput("");
+                  }}
+                  disabled={adminAuthSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" variant="premium" disabled={adminAuthSubmitting}>
+                  {adminAuthSubmitting ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                  Verify & Continue
+                </Button>
+              </div>
+            </motion.form>
+          </motion.div>
         )}
       </AnimatePresence>
 
