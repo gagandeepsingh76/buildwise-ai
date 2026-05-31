@@ -100,6 +100,23 @@ export type DocumentRecord = {
   created_at?: string | null;
 };
 
+export type DocumentChunkRecord = {
+  id: string;
+  chunk_index: number;
+  content: string;
+  token_count: number;
+  page_start?: number | null;
+  page_end?: number | null;
+  created_at?: string | null;
+};
+
+export type AdminDocumentDetail = {
+  document: DocumentRecord;
+  chunks: DocumentChunkRecord[];
+  preview_available: boolean;
+  download_available: boolean;
+};
+
 export type HistoryItem = {
   id: string;
   session_id?: string | null;

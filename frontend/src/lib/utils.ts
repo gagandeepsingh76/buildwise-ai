@@ -31,6 +31,11 @@ export function formatFileSize(bytes?: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export function formatDate(value?: string | null) {
+  if (!value) return "Not available";
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+}
+
 export function truncateMiddle(value: string, max = 48) {
   if (value.length <= max) return value;
   const left = Math.ceil((max - 3) / 2);

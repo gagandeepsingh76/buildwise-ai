@@ -14,6 +14,8 @@ class InMemoryStore:
         self.queries: list[dict[str, Any]] = []
         self.favorites: list[dict[str, Any]] = []
         self.feedback: list[dict[str, Any]] = []
+        self.document_files: dict[str, bytes] = {}
+        self.document_file_types: dict[str, str] = {}
 
     def add_document(self, payload: dict[str, Any]) -> dict[str, Any]:
         now = datetime.now(timezone.utc).isoformat()
@@ -46,10 +48,28 @@ class InMemoryStore:
                     [chunk for chunk in self.chunks if chunk["document_id"] == document_id]
                 )
 
+    def replace_chunks(self, document_id: str, chunks: list[dict[str, Any]]) -> None:
+        self.chunks = [chunk for chunk in self.chunks if chunk["document_id"] != document_id]
+        self.add_chunks(chunks)
+        if document_id in self.documents:
+            self.documents[document_id]["chunk_count"] = len(chunks)
+
+    def add_document_file(self, document_id: str, content: bytes, content_type: str) -> None:
+        self.document_files[document_id] = content
+        self.document_file_types[document_id] = content_type
+
     def delete_document(self, document_id: str) -> None:
         if document_id in self.documents:
             self.documents[document_id]["status"] = "deleted"
         self.chunks = [chunk for chunk in self.chunks if chunk["document_id"] != document_id]
+
+    def hard_delete_document(self, document_id: str) -> int:
+        chunk_count = len([chunk for chunk in self.chunks if chunk["document_id"] == document_id])
+        self.documents.pop(document_id, None)
+        self.chunks = [chunk for chunk in self.chunks if chunk["document_id"] != document_id]
+        self.document_files.pop(document_id, None)
+        self.document_file_types.pop(document_id, None)
+        return chunk_count
 
     def save_query(self, payload: dict[str, Any]) -> dict[str, Any]:
         record = {"id": str(uuid4()), "created_at": datetime.now(timezone.utc).isoformat(), **payload}

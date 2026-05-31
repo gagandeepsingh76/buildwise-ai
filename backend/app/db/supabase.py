@@ -109,6 +109,41 @@ class SupabaseRepository:
 
         return await asyncio.to_thread(run)
 
+    async def list_document_chunks(self, document_id: str) -> list[dict[str, Any]]:
+        if not self.client:
+            return []
+
+        def run():
+            return (
+                self.client.table("document_chunks")
+                .select("id,chunk_index,content,token_count,page_start,page_end,created_at,metadata")
+                .eq("document_id", document_id)
+                .order("chunk_index")
+                .execute()
+                .data
+                or []
+            )
+
+        return await asyncio.to_thread(run)
+
+    async def delete_document_chunks(self, document_id: str) -> int:
+        if not self.client:
+            return 0
+
+        def run():
+            existing = (
+                self.client.table("document_chunks")
+                .select("id")
+                .eq("document_id", document_id)
+                .execute()
+                .data
+                or []
+            )
+            self.client.table("document_chunks").delete().eq("document_id", document_id).execute()
+            return len(existing)
+
+        return await asyncio.to_thread(run)
+
     async def insert_chunks(self, chunks: list[dict[str, Any]]) -> None:
         if not self.client or not chunks:
             return
@@ -125,6 +160,25 @@ class SupabaseRepository:
         await asyncio.to_thread(
             lambda: self.client.table("documents").update({"status": "deleted"}).eq("id", document_id).execute()
         )
+
+    async def hard_delete_document(self, document_id: str) -> int:
+        if not self.client:
+            return 0
+
+        def run():
+            existing = (
+                self.client.table("document_chunks")
+                .select("id")
+                .eq("document_id", document_id)
+                .execute()
+                .data
+                or []
+            )
+            self.client.table("document_chunks").delete().eq("document_id", document_id).execute()
+            self.client.table("documents").delete().eq("id", document_id).execute()
+            return len(existing)
+
+        return await asyncio.to_thread(run)
 
     async def resolve_authority_db_id(self, authority_slug: str | None) -> str | None:
         if not self.client or not authority_slug:
@@ -543,6 +597,38 @@ class SupabaseRepository:
         except Exception as exc:  # pragma: no cover - external dependency
             logger.warning("supabase_storage_upload_failed", path=path, error=str(exc))
             return None
+
+    async def download_file(self, path: str) -> bytes | None:
+        if not self.client:
+            return None
+
+        def run():
+            content = self.client.storage.from_(self.settings.supabase_storage_bucket).download(path)
+            if isinstance(content, bytes):
+                return content
+            if hasattr(content, "content"):
+                return content.content
+            return bytes(content)
+
+        try:
+            return await asyncio.to_thread(run)
+        except Exception as exc:  # pragma: no cover - external dependency
+            logger.warning("supabase_storage_download_failed", path=path, error=str(exc))
+            return None
+
+    async def delete_file(self, path: str | None) -> bool:
+        if not self.client or not path:
+            return False
+
+        def run():
+            self.client.storage.from_(self.settings.supabase_storage_bucket).remove([path])
+            return True
+
+        try:
+            return await asyncio.to_thread(run)
+        except Exception as exc:  # pragma: no cover - external dependency
+            logger.warning("supabase_storage_delete_failed", path=path, error=str(exc))
+            return False
 
     async def save_query(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         if not self.client:

@@ -1,4 +1,4 @@
-import type { AskResponse, Authority, DocumentRecord, HistoryItem, Language, SourceReference, WizardContext } from "@/lib/types";
+import type { AdminDocumentDetail, AskResponse, Authority, DocumentRecord, HistoryItem, Language, SourceReference, WizardContext } from "@/lib/types";
 
 const configuredApiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "").trim();
 
@@ -157,6 +157,84 @@ export async function uploadDocument(form: FormData, adminKey: string) {
       throw new BuildWiseApiError(message, { status: response.status, code, details });
     }
     return response.json() as Promise<{ chunks_indexed: number; document: DocumentRecord; message: string }>;
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  } finally {
+    timeout.cancel();
+  }
+}
+
+function adminHeaders(adminKey: string) {
+  return { "X-Admin-Api-Key": adminKey };
+}
+
+function adminDocumentQuery(filters?: {
+  search?: string;
+  authority_id?: string;
+  document_type?: string;
+  status?: string;
+}) {
+  const params = new URLSearchParams();
+  Object.entries(filters || {}).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function getAdminDocuments(adminKey: string, filters?: {
+  search?: string;
+  authority_id?: string;
+  document_type?: string;
+  status?: string;
+}) {
+  return request<DocumentRecord[]>(`/admin/documents${adminDocumentQuery(filters)}`, {
+    cache: "no-store",
+    headers: adminHeaders(adminKey),
+  });
+}
+
+export async function getAdminDocument(documentId: string, adminKey: string) {
+  return request<AdminDocumentDetail>(`/admin/documents/${documentId}`, {
+    cache: "no-store",
+    headers: adminHeaders(adminKey),
+  });
+}
+
+export async function deleteAdminDocument(documentId: string, adminKey: string) {
+  return request<{ document_id: string; chunks_deleted: number; file_deleted: boolean; message: string }>(
+    `/admin/documents/${documentId}`,
+    {
+      method: "DELETE",
+      headers: adminHeaders(adminKey),
+    },
+  );
+}
+
+export async function reindexAdminDocument(documentId: string, adminKey: string) {
+  return request<{ document: DocumentRecord; chunks_indexed: number; message: string }>(
+    `/admin/documents/${documentId}/reindex`,
+    {
+      method: "POST",
+      headers: adminHeaders(adminKey),
+    },
+  );
+}
+
+export async function getAdminDocumentFile(documentId: string, adminKey: string) {
+  assertApiConfigured();
+  const timeout = timeoutSignal(90000);
+  try {
+    const response = await fetch(apiUrl(`/admin/documents/${documentId}/file`), {
+      cache: "no-store",
+      signal: timeout.signal,
+      headers: adminHeaders(adminKey),
+    });
+    if (!response.ok) {
+      const { message, code, details } = await readErrorMessage(response);
+      throw new BuildWiseApiError(message, { status: response.status, code, details });
+    }
+    return response.blob();
   } catch (error) {
     throw normalizeNetworkError(error);
   } finally {

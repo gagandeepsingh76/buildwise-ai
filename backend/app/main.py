@@ -7,6 +7,7 @@ from fastapi.responses import ORJSONResponse
 
 from app.api.routes import (
     ask,
+    admin_documents,
     authorities,
     documents,
     favorites,
@@ -43,6 +44,7 @@ app.add_middleware(
 
 # ROUTES
 app.include_router(health.router)
+app.include_router(admin_documents.router)
 app.include_router(authorities.router)
 app.include_router(ask.router)
 app.include_router(search.router)

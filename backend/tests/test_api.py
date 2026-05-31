@@ -88,6 +88,8 @@ def test_roof_top_garden_upload_content_appears_in_grounded_answer_sections():
     services = get_services()
     services.store.documents.clear()
     services.store.chunks.clear()
+    services.store.document_files.clear()
+    services.store.document_file_types.clear()
 
     pdf_bytes = _make_text_pdf(
         "Roof top garden rules require prior KDA approval. "
@@ -126,6 +128,85 @@ def test_roof_top_garden_upload_content_appears_in_grounded_answer_sections():
     assert "structural safety certificate" in " ".join(answer["required_documents"]).lower()
     assert "shall not overload" in " ".join(answer["relevant_restrictions"]).lower()
     assert "structural inspection" in " ".join(answer["inspection_requirements"]).lower()
+
+
+def test_admin_document_detail_file_reindex_and_delete_lifecycle():
+    services = get_services()
+    services.store.documents.clear()
+    services.store.chunks.clear()
+    services.store.document_files.clear()
+    services.store.document_file_types.clear()
+
+    pdf_bytes = _make_text_pdf(
+        "KDA permit manual requires plan approval. Required documents include ownership certificate."
+    )
+    upload_response = client.post(
+        "/documents",
+        headers={"X-Admin-Api-Key": "change-this-before-production"},
+        data={
+            "authority_id": "kda-kanpur",
+            "title": "KDA Permit Manual",
+            "document_type": "permit-manual",
+            "city": "Kanpur",
+            "state": "Uttar Pradesh",
+            "country": "India",
+            "official_url": "https://www.kdaindia.co.in/",
+            "tags": "permit,approval",
+        },
+        files={"file": ("kda-permit.pdf", pdf_bytes, "application/pdf")},
+    )
+    assert upload_response.status_code == 200
+    document_id = upload_response.json()["document"]["id"]
+
+    unauthorized = client.delete(f"/admin/documents/{document_id}")
+    assert unauthorized.status_code == 401
+
+    list_response = client.get(
+        "/admin/documents",
+        headers={"X-Admin-Api-Key": "change-this-before-production"},
+    )
+    assert list_response.status_code == 200
+    assert any(document["id"] == document_id for document in list_response.json())
+
+    detail_response = client.get(
+        f"/admin/documents/{document_id}",
+        headers={"X-Admin-Api-Key": "change-this-before-production"},
+    )
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    assert detail["document"]["title"] == "KDA Permit Manual"
+    assert detail["chunks"]
+    assert detail["preview_available"] is True
+
+    file_response = client.get(
+        f"/admin/documents/{document_id}/file",
+        headers={"X-Admin-Api-Key": "change-this-before-production"},
+    )
+    assert file_response.status_code == 200
+    assert file_response.headers["content-type"].startswith("application/pdf")
+
+    reindex_response = client.post(
+        f"/admin/documents/{document_id}/reindex",
+        headers={"X-Admin-Api-Key": "change-this-before-production"},
+    )
+    assert reindex_response.status_code == 200
+    assert reindex_response.json()["chunks_indexed"] >= 1
+
+    delete_response = client.delete(
+        f"/admin/documents/{document_id}",
+        headers={"X-Admin-Api-Key": "change-this-before-production"},
+    )
+    assert delete_response.status_code == 200
+    assert delete_response.json()["chunks_deleted"] >= 1
+    assert document_id not in services.store.documents
+    assert document_id not in services.store.document_files
+    assert not [chunk for chunk in services.store.chunks if chunk["document_id"] == document_id]
+
+    missing_detail = client.get(
+        f"/admin/documents/{document_id}",
+        headers={"X-Admin-Api-Key": "change-this-before-production"},
+    )
+    assert missing_detail.status_code == 404
 
 
 def test_supabase_lexical_fallback_recovers_uploaded_roof_top_chunk():

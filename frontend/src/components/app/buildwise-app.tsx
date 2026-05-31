@@ -14,10 +14,13 @@ import {
   Download,
   Eye,
   ExternalLink,
+  FileDown,
   FileSearch,
   FileText,
+  Filter,
   Globe2,
   History,
+  Layers3,
   Link2,
   Loader2,
   Menu as MenuIcon,
@@ -30,7 +33,9 @@ import {
   Sparkles,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
   UploadCloud,
+  X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -46,10 +51,23 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { askBuildWise, getAuthorities, getDocuments, getHistory, searchDocuments, sendFeedback, uploadDocument } from "@/lib/api";
+import {
+  askBuildWise,
+  deleteAdminDocument,
+  getAdminDocument,
+  getAdminDocumentFile,
+  getAdminDocuments,
+  getAuthorities,
+  getDocuments,
+  getHistory,
+  reindexAdminDocument,
+  searchDocuments,
+  sendFeedback,
+  uploadDocument,
+} from "@/lib/api";
 import { t, translations } from "@/lib/i18n";
-import type { AskResponse, Authority, DocumentRecord, HistoryItem, Language, SourceReference, WizardContext } from "@/lib/types";
-import { cn, decisionLabel, formatConfidence, formatDecision, formatFileSize, truncateMiddle } from "@/lib/utils";
+import type { AdminDocumentDetail, AskResponse, Authority, DocumentRecord, HistoryItem, Language, SourceReference, WizardContext } from "@/lib/types";
+import { cn, decisionLabel, formatConfidence, formatDate, formatDecision, formatFileSize, truncateMiddle } from "@/lib/utils";
 
 const NONE = "__none";
 
@@ -233,6 +251,19 @@ export function BuildWiseApp() {
   const [systemNotice, setSystemNotice] = useState<string | null>(null);
   const [adminKey, setAdminKey] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentSearch, setDocumentSearch] = useState("");
+  const [documentAuthorityFilter, setDocumentAuthorityFilter] = useState(NONE);
+  const [documentTypeFilter, setDocumentTypeFilter] = useState(NONE);
+  const [documentStatusFilter, setDocumentStatusFilter] = useState(NONE);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [documentDetail, setDocumentDetail] = useState<AdminDocumentDetail | null>(null);
+  const [documentDetailLoading, setDocumentDetailLoading] = useState(false);
+  const [documentActionLoading, setDocumentActionLoading] = useState<string | null>(null);
+  const [deleteCandidateIds, setDeleteCandidateIds] = useState<string[]>([]);
+  const [previewDocument, setPreviewDocument] = useState<DocumentRecord | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [docSearchQuery, setDocSearchQuery] = useState("roof garden structural approval");
   const [docSearchResults, setDocSearchResults] = useState<SourceReference[]>([]);
   const [docSearching, setDocSearching] = useState(false);
@@ -317,9 +348,43 @@ export function BuildWiseApp() {
     return () => window.clearTimeout(timeout);
   }, [answer, loading, shouldScrollToResult]);
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
   const selectedAuthority = authorities.find((item) => item.id === wizard.authority_id);
   const compareLeft = authorities.find((item) => item.id === compareA);
   const compareRight = authorities.find((item) => item.id === compareB);
+  const authorityNameById = useMemo(
+    () => Object.fromEntries(authorities.map((authority) => [authority.id, authority.short_name || authority.name])),
+    [authorities],
+  );
+  const documentTypes = useMemo(
+    () => Array.from(new Set(documents.map((document) => document.document_type).filter(Boolean))).sort(),
+    [documents],
+  );
+  const documentStatuses = useMemo(
+    () => Array.from(new Set(documents.map((document) => document.status).filter(Boolean))).sort(),
+    [documents],
+  );
+  const filteredDocuments = useMemo(() => {
+    const needle = documentSearch.trim().toLowerCase();
+    return documents.filter((document) => {
+      const authorityName = authorityNameById[document.authority_id] || document.authority_id;
+      const matchesSearch = !needle
+        || document.title.toLowerCase().includes(needle)
+        || authorityName.toLowerCase().includes(needle)
+        || document.authority_id.toLowerCase().includes(needle)
+        || document.city.toLowerCase().includes(needle)
+        || document.tags.join(" ").toLowerCase().includes(needle);
+      const matchesAuthority = documentAuthorityFilter === NONE || document.authority_id === documentAuthorityFilter;
+      const matchesType = documentTypeFilter === NONE || document.document_type === documentTypeFilter;
+      const matchesStatus = documentStatusFilter === NONE || document.status === documentStatusFilter;
+      return matchesSearch && matchesAuthority && matchesType && matchesStatus;
+    });
+  }, [authorityNameById, documentAuthorityFilter, documentSearch, documentStatusFilter, documentTypeFilter, documents]);
 
   const checklist = useMemo(() => {
     const base = [
@@ -496,6 +561,141 @@ export function BuildWiseApp() {
       toast.error(error instanceof Error ? error.message : copy("uploadFailed"));
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function refreshAdminDocuments() {
+    if (!adminKey.trim()) {
+      toast.error("Admin key required");
+      return;
+    }
+    setDocumentsLoading(true);
+    try {
+      const response = await getAdminDocuments(adminKey, {
+        search: documentSearch || undefined,
+        authority_id: documentAuthorityFilter === NONE ? undefined : documentAuthorityFilter,
+        document_type: documentTypeFilter === NONE ? undefined : documentTypeFilter,
+        status: documentStatusFilter === NONE ? undefined : documentStatusFilter,
+      });
+      setDocuments(response);
+      setSelectedDocumentIds((current) => current.filter((id) => response.some((document) => document.id === id)));
+      toast.success("Documents refreshed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load admin documents.");
+    } finally {
+      setDocumentsLoading(false);
+    }
+  }
+
+  async function openDocumentDetail(documentId: string) {
+    if (!adminKey.trim()) {
+      toast.error("Admin key required to view chunks.");
+      return;
+    }
+    setDocumentDetailLoading(true);
+    try {
+      const detail = await getAdminDocument(documentId, adminKey);
+      setDocumentDetail(detail);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load document details.");
+    } finally {
+      setDocumentDetailLoading(false);
+    }
+  }
+
+  async function openPdfPreview(document: DocumentRecord) {
+    if (!adminKey.trim()) {
+      toast.error("Admin key required to preview PDFs.");
+      return;
+    }
+    setPreviewDocument(document);
+    setPreviewLoading(true);
+    try {
+      const blob = await getAdminDocumentFile(document.id, adminKey);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch (error) {
+      setPreviewDocument(null);
+      toast.error(error instanceof Error ? error.message : "Could not preview the original PDF.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function downloadOriginalPdf(document: DocumentRecord) {
+    if (!adminKey.trim()) {
+      toast.error("Admin key required to download PDFs.");
+      return;
+    }
+    try {
+      const blob = await getAdminDocumentFile(document.id, adminKey);
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      anchor.href = url;
+      anchor.download = document.file_name || `${document.title}.pdf`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not download the original PDF.");
+    }
+  }
+
+  function toggleDocumentSelection(documentId: string) {
+    setSelectedDocumentIds((current) =>
+      current.includes(documentId) ? current.filter((id) => id !== documentId) : [...current, documentId],
+    );
+  }
+
+  function toggleAllFilteredDocuments() {
+    const filteredIds = filteredDocuments.map((document) => document.id);
+    const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedDocumentIds.includes(id));
+    setSelectedDocumentIds(allSelected ? selectedDocumentIds.filter((id) => !filteredIds.includes(id)) : Array.from(new Set([...selectedDocumentIds, ...filteredIds])));
+  }
+
+  async function confirmDeleteDocuments() {
+    if (!adminKey.trim()) {
+      toast.error("Admin key required");
+      return;
+    }
+    const ids = deleteCandidateIds;
+    if (!ids.length) return;
+    setDocumentActionLoading("delete");
+    try {
+      await Promise.all(ids.map((documentId) => deleteAdminDocument(documentId, adminKey)));
+      setDocuments((current) => current.filter((document) => !ids.includes(document.id)));
+      setSelectedDocumentIds((current) => current.filter((documentId) => !ids.includes(documentId)));
+      if (documentDetail && ids.includes(documentDetail.document.id)) setDocumentDetail(null);
+      setDeleteCandidateIds([]);
+      toast.success(ids.length === 1 ? "Document deleted" : `${ids.length} documents deleted`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Delete failed.");
+    } finally {
+      setDocumentActionLoading(null);
+    }
+  }
+
+  async function reindexDocuments(documentIds: string[]) {
+    if (!adminKey.trim()) {
+      toast.error("Admin key required");
+      return;
+    }
+    if (!documentIds.length) return;
+    setDocumentActionLoading("reindex");
+    try {
+      const responses = await Promise.all(documentIds.map((documentId) => reindexAdminDocument(documentId, adminKey)));
+      const updatedDocuments = responses.map((response) => response.document);
+      setDocuments((current) =>
+        current.map((document) => updatedDocuments.find((updated) => updated.id === document.id) || document),
+      );
+      if (documentDetail) {
+        const updated = updatedDocuments.find((document) => document.id === documentDetail.document.id);
+        if (updated) void openDocumentDetail(updated.id);
+      }
+      toast.success(documentIds.length === 1 ? "Document reindexed" : `${documentIds.length} documents reindexed`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Reindex failed.");
+    } finally {
+      setDocumentActionLoading(null);
     }
   }
 
@@ -1050,6 +1250,156 @@ export function BuildWiseApp() {
                 ))}
               </div>
             </form>
+
+            <div className="glass-panel rounded-lg p-5 lg:col-span-2">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <Badge className="bg-slate-900/5 text-slate-700 ring-slate-900/10 dark:bg-white/10 dark:text-slate-200">
+                    <Layers3 className="mr-1 size-3.5" />
+                    Documents
+                  </Badge>
+                  <h3 className="mt-3 text-2xl font-semibold">Uploaded documents</h3>
+                  <p className="bw-text-muted mt-2 max-w-2xl text-sm leading-6">
+                    Review indexed PDFs, inspect chunks, preview originals, and safely manage reindexing or deletion.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="secondary" size="sm" onClick={refreshAdminDocuments} disabled={documentsLoading}>
+                    {documentsLoading ? <Loader2 className="size-4 animate-spin" /> : <Filter className="size-4" />}
+                    Refresh
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={!selectedDocumentIds.length || documentActionLoading === "reindex"}
+                    onClick={() => reindexDocuments(selectedDocumentIds)}
+                  >
+                    {documentActionLoading === "reindex" ? <Loader2 className="size-4 animate-spin" /> : <Database className="size-4" />}
+                    Reindex selected
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    disabled={!selectedDocumentIds.length || documentActionLoading === "delete"}
+                    onClick={() => setDeleteCandidateIds(selectedDocumentIds)}
+                  >
+                    <Trash2 className="size-4" />
+                    Delete selected
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 lg:grid-cols-[1.1fr_.9fr_.7fr_.7fr]">
+                <Input value={documentSearch} onChange={(event) => setDocumentSearch(event.target.value)} placeholder="Search title, authority, city, or tags" />
+                <Select value={documentAuthorityFilter} onValueChange={setDocumentAuthorityFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Authority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>All authorities</SelectItem>
+                    {authorities.map((authority) => (
+                      <SelectItem key={authority.id} value={authority.id}>
+                        {authority.short_name} / {authority.city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={documentTypeFilter} onValueChange={setDocumentTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>All types</SelectItem>
+                    {documentTypes.map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={documentStatusFilter} onValueChange={setDocumentStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>All status</SelectItem>
+                    {documentStatuses.map((status) => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="mt-5 overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="grid min-w-[980px] grid-cols-[44px_1.4fr_.85fr_.75fr_.85fr_.75fr_.65fr_.7fr_.8fr_180px] gap-3 border-b border-slate-200 px-3 py-3 text-xs font-semibold uppercase text-slate-500 dark:border-white/10 dark:text-slate-400">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all documents"
+                    checked={filteredDocuments.length > 0 && filteredDocuments.every((document) => selectedDocumentIds.includes(document.id))}
+                    onChange={toggleAllFilteredDocuments}
+                    className="size-4 rounded border-slate-300"
+                  />
+                  <span>Title</span>
+                  <span>Authority</span>
+                  <span>City</span>
+                  <span>State</span>
+                  <span>Type</span>
+                  <span>Uploaded</span>
+                  <span>Chunks</span>
+                  <span>Status</span>
+                  <span>Actions</span>
+                </div>
+                <div className="max-h-[560px] min-w-[980px] overflow-y-auto">
+                  {documentsLoading && Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="m-3 h-16" />)}
+                  {!documentsLoading && filteredDocuments.map((document) => (
+                    <div key={document.id} className="grid grid-cols-[44px_1.4fr_.85fr_.75fr_.85fr_.75fr_.65fr_.7fr_.8fr_180px] items-center gap-3 border-b border-slate-100 px-3 py-3 text-sm last:border-b-0 dark:border-white/10">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${document.title}`}
+                        checked={selectedDocumentIds.includes(document.id)}
+                        onChange={() => toggleDocumentSelection(document.id)}
+                        className="size-4 rounded border-slate-300"
+                      />
+                      <button type="button" onClick={() => openDocumentDetail(document.id)} className="text-left font-semibold text-slate-950 hover:text-teal-700 dark:text-white dark:hover:text-teal-200">
+                        {document.title}
+                        <span className="bw-text-muted mt-1 block text-xs font-normal">{document.file_name || "PDF"}</span>
+                      </button>
+                      <span className="bw-text-secondary">{authorityNameById[document.authority_id] || document.authority_id}</span>
+                      <span className="bw-text-secondary">{document.city}</span>
+                      <span className="bw-text-secondary">{document.state}</span>
+                      <span className="bw-text-secondary">{document.document_type}</span>
+                      <span className="bw-text-muted text-xs">{formatDate(document.created_at)}</span>
+                      <Badge className="w-fit bg-teal-500/15 text-teal-700 ring-teal-500/20 dark:text-teal-200">{document.chunk_count}</Badge>
+                      <DocumentStatusBadge status={document.status} />
+                      <div className="flex items-center gap-1">
+                        <Button type="button" variant="ghost" size="icon" title="View details" onClick={() => openDocumentDetail(document.id)}>
+                          <Eye className="size-4" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon" title="Preview PDF" onClick={() => openPdfPreview(document)}>
+                          <FileSearch className="size-4" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon" title="Download PDF" onClick={() => downloadOriginalPdf(document)}>
+                          <FileDown className="size-4" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon" title="Reindex" onClick={() => reindexDocuments([document.id])}>
+                          <Database className="size-4" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon" title="Delete" onClick={() => setDeleteCandidateIds([document.id])}>
+                          <Trash2 className="size-4 text-rose-600" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {!documentsLoading && filteredDocuments.length === 0 && (
+                    <div className="p-8 text-center">
+                      <FileText className="mx-auto size-10 text-teal-500" />
+                      <p className="bw-text-primary mt-3 text-sm font-semibold">No documents match the current filters.</p>
+                      <p className="bw-text-muted mt-1 text-sm">Upload a PDF or clear search filters to see indexed authority documents.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       </main>
@@ -1068,6 +1418,182 @@ export function BuildWiseApp() {
             <Eye className="size-4" />
             {copy("viewResult")}
           </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {(documentDetail || documentDetailLoading) && (
+          <motion.div
+            className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.aside
+              initial={{ x: 420 }}
+              animate={{ x: 0 }}
+              exit={{ x: 420 }}
+              transition={{ type: "spring", damping: 28, stiffness: 260 }}
+              className="ml-auto flex h-full w-full max-w-3xl flex-col border-l border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5 dark:border-white/10">
+                <div>
+                  <p className="bw-text-muted text-xs font-semibold uppercase">Document details</p>
+                  <h3 className="bw-text-primary mt-1 text-xl font-semibold">{documentDetail?.document.title || "Loading document"}</h3>
+                  {documentDetail?.document && (
+                    <p className="bw-text-muted mt-1 text-sm">
+                      {authorityNameById[documentDetail.document.authority_id] || documentDetail.document.authority_id} / {documentDetail.document.city}, {documentDetail.document.state}
+                    </p>
+                  )}
+                </div>
+                <Button type="button" variant="secondary" size="icon" onClick={() => setDocumentDetail(null)} aria-label="Close document details">
+                  <X className="size-4" />
+                </Button>
+              </div>
+
+              {documentDetailLoading && (
+                <div className="space-y-3 p-5">
+                  <Skeleton className="h-24" />
+                  <Skeleton className="h-40" />
+                  <Skeleton className="h-40" />
+                </div>
+              )}
+
+              {!documentDetailLoading && documentDetail && (
+                <div className="flex-1 overflow-y-auto p-5">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <DetailMetric label="Chunks" value={`${documentDetail.document.chunk_count}`} />
+                    <DetailMetric label="Status" value={documentDetail.document.status} />
+                    <DetailMetric label="File size" value={formatFileSize(documentDetail.document.file_size)} />
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <MetadataRow label="Document type" value={documentDetail.document.document_type} />
+                    <MetadataRow label="Upload date" value={formatDate(documentDetail.document.created_at)} />
+                    <MetadataRow label="Issuing department" value={documentDetail.document.issuing_department || "Not provided"} />
+                    <MetadataRow label="Original file" value={documentDetail.document.file_name || "Not available"} />
+                  </div>
+                  <div className="mt-4 bw-card-soft rounded-lg p-4">
+                    <p className="bw-text-primary text-sm font-semibold">Tags</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {documentDetail.document.tags.length ? documentDetail.document.tags.map((tag) => (
+                        <Badge key={tag} className="bg-teal-500/15 text-teal-700 ring-teal-500/20 dark:text-teal-200">{tag}</Badge>
+                      )) : <span className="bw-text-muted text-sm">No tags</span>}
+                    </div>
+                    {documentDetail.document.official_url && (
+                      <a href={documentDetail.document.official_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-teal-700 dark:text-teal-300">
+                        Source URL
+                        <ExternalLink className="size-3.5" />
+                      </a>
+                    )}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button type="button" variant="secondary" size="sm" onClick={() => openPdfPreview(documentDetail.document)} disabled={!documentDetail.preview_available}>
+                      <FileSearch className="size-4" />
+                      Preview PDF
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => downloadOriginalPdf(documentDetail.document)} disabled={!documentDetail.download_available}>
+                      <FileDown className="size-4" />
+                      Download
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => reindexDocuments([documentDetail.document.id])}>
+                      <Database className="size-4" />
+                      Reindex
+                    </Button>
+                    <Button type="button" variant="danger" size="sm" onClick={() => setDeleteCandidateIds([documentDetail.document.id])}>
+                      <Trash2 className="size-4" />
+                      Delete
+                    </Button>
+                  </div>
+                  <div className="mt-6">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h4 className="bw-text-primary text-base font-semibold">Indexed chunks</h4>
+                      <Badge className="bg-slate-900/5 text-slate-700 ring-slate-900/10 dark:bg-white/10 dark:text-slate-200">
+                        {documentDetail.chunks.length} chunks
+                      </Badge>
+                    </div>
+                    <div className="space-y-3">
+                      {documentDetail.chunks.map((chunk) => (
+                        <details key={chunk.id} className="bw-card-soft rounded-lg p-4">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                            <span className="bw-text-primary text-sm font-semibold">
+                              Chunk {chunk.chunk_index + 1}
+                              {chunk.page_start ? ` / page ${chunk.page_start}${chunk.page_end && chunk.page_end !== chunk.page_start ? `-${chunk.page_end}` : ""}` : ""}
+                            </span>
+                            <span className="bw-text-muted text-xs">{chunk.token_count} tokens</span>
+                          </summary>
+                          <p className="bw-text-secondary mt-3 whitespace-pre-wrap text-sm leading-6">{chunk.content}</p>
+                        </details>
+                      ))}
+                      {!documentDetail.chunks.length && (
+                        <p className="bw-text-muted rounded-lg border border-dashed border-slate-300 p-6 text-sm dark:border-white/15">
+                          No chunks are indexed for this document.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.aside>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {(previewDocument || previewLoading) && (
+          <motion.div className="fixed inset-0 z-50 bg-slate-950/70 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-lg border border-white/10 bg-white shadow-2xl dark:bg-slate-950">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-white/10">
+                <div>
+                  <h3 className="bw-text-primary text-base font-semibold">{previewDocument?.title || "PDF preview"}</h3>
+                  <p className="bw-text-muted text-sm">{previewDocument?.file_name || "Original uploaded PDF"}</p>
+                </div>
+                <Button type="button" variant="secondary" size="icon" onClick={() => { setPreviewDocument(null); setPreviewUrl(null); }} aria-label="Close PDF preview">
+                  <X className="size-4" />
+                </Button>
+              </div>
+              <div className="flex-1 bg-slate-100 dark:bg-slate-900">
+                {previewLoading && <div className="flex h-full items-center justify-center"><Loader2 className="size-6 animate-spin text-teal-500" /></div>}
+                {!previewLoading && previewUrl && <iframe title="PDF preview" src={previewUrl} className="h-full w-full" />}
+              </div>
+              {previewDocument && (
+                <div className="flex justify-end gap-2 border-t border-slate-200 p-3 dark:border-white/10">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => downloadOriginalPdf(previewDocument)}>
+                    <FileDown className="size-4" />
+                    Download PDF
+                  </Button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteCandidateIds.length > 0 && (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div initial={{ y: 20, scale: 0.98 }} animate={{ y: 0, scale: 1 }} exit={{ y: 12, scale: 0.98 }} className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-slate-950">
+              <div className="flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-300">
+                  <Trash2 className="size-5" />
+                </span>
+                <div>
+                  <h3 className="bw-text-primary text-base font-semibold">Delete document{deleteCandidateIds.length > 1 ? "s" : ""}?</h3>
+                  <p className="bw-text-muted mt-2 text-sm leading-6">
+                    Are you sure you want to permanently delete this document and all indexed chunks?
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => setDeleteCandidateIds([])} disabled={documentActionLoading === "delete"}>
+                  Cancel
+                </Button>
+                <Button type="button" variant="danger" onClick={confirmDeleteDocuments} disabled={documentActionLoading === "delete"}>
+                  {documentActionLoading === "delete" ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                  Delete permanently
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -1338,6 +1864,36 @@ function Metric({ icon: Icon, label, value }: { icon: typeof Building2; label: s
       <p className="bw-text-muted text-sm">{label}</p>
     </div>
   );
+}
+
+function DetailMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bw-card-soft rounded-lg p-4">
+      <p className="bw-text-muted text-xs font-semibold uppercase">{label}</p>
+      <p className="bw-text-primary mt-2 text-lg font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function MetadataRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+      <p className="bw-text-muted text-xs font-semibold uppercase">{label}</p>
+      <p className="bw-text-primary mt-1 break-words text-sm">{value}</p>
+    </div>
+  );
+}
+
+function DocumentStatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+  const className = normalized === "indexed"
+    ? "bg-emerald-500/15 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300"
+    : normalized === "processing"
+      ? "bg-amber-500/15 text-amber-700 ring-amber-500/20 dark:text-amber-300"
+      : normalized === "failed"
+        ? "bg-rose-500/15 text-rose-700 ring-rose-500/20 dark:text-rose-300"
+        : "bg-slate-900/5 text-slate-700 ring-slate-900/10 dark:bg-white/10 dark:text-slate-200";
+  return <Badge className={cn("w-fit ring-1", className)}>{status}</Badge>;
 }
 
 function AuthorityCard({ authority, onSelect }: { authority: Authority; onSelect: () => void }) {

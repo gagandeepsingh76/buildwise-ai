@@ -170,7 +170,37 @@ class DocumentRecord(DocumentMetadata):
     created_at: datetime | None = None
 
 
+class DocumentChunkRecord(BaseModel):
+    id: str
+    chunk_index: int
+    content: str
+    token_count: int = 0
+    page_start: int | None = None
+    page_end: int | None = None
+    created_at: datetime | None = None
+
+
+class AdminDocumentDetail(BaseModel):
+    document: DocumentRecord
+    chunks: list[DocumentChunkRecord] = Field(default_factory=list)
+    preview_available: bool = False
+    download_available: bool = False
+
+
 class IngestResponse(BaseModel):
+    document: DocumentRecord
+    chunks_indexed: int
+    message: str
+
+
+class AdminDeleteResponse(BaseModel):
+    document_id: str
+    chunks_deleted: int
+    file_deleted: bool
+    message: str
+
+
+class AdminReindexResponse(BaseModel):
     document: DocumentRecord
     chunks_indexed: int
     message: str
