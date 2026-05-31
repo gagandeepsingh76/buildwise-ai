@@ -15,7 +15,7 @@ from app.models.schemas import (
     GroundedAnswer,
     SourceReference,
 )
-from app.utils.text import split_sentences
+from app.utils.text import excerpt, split_sentences
 
 
 logger = structlog.get_logger(__name__)
@@ -194,6 +194,12 @@ Rules:
             if sanitized["confidence_indicator"] in {"High", "Medium", "Low"}
             else self._confidence(sources).value
         )
+        zero_reason = self._retrieval_zero_reason(sources)
+        actual_sources = [source for source in sources if not source.metadata.get("seed")]
+        if zero_reason and not actual_sources:
+            note = f"No uploaded authority chunks were retrieved. Retrieval reason: {zero_reason}"
+            if note not in sanitized["assumptions_uncertainty_notes"]:
+                sanitized["assumptions_uncertainty_notes"].append(note)
         return sanitized
 
     def _local_answer(
@@ -245,13 +251,22 @@ Rules:
             )
 
         if not actual_sources:
+            zero_reason = self._retrieval_zero_reason(sources)
             summary = (
                 f"{authority_name} was detected for this location, but no indexed official rule text was retrieved for the exact issue. "
                 "I cannot confirm whether it is allowed without the relevant authority document."
             )
-            missing_note = "Exact rule text is unavailable because the relevant official PDF/bylaw/circular has not been uploaded and indexed."
+            missing_note = (
+                f"No uploaded authority chunks were retrieved. Retrieval reason: {zero_reason}"
+                if zero_reason
+                else "Exact rule text is unavailable because the relevant official PDF/bylaw/circular has not been uploaded and indexed."
+            )
         else:
-            summary = "This answer is grounded in the retrieved official source excerpts. Any rule not visible in the sources is treated as uncertain."
+            summary_context = self._summary_context(actual_sources, relevant_sentences)
+            summary = (
+                f"Retrieved source context from {actual_sources[0].document_title}: {summary_context} "
+                "Any rule not visible in the sources is treated as uncertain."
+            )
             missing_note = "Where the retrieved excerpts do not state a requirement directly, the item remains uncertain."
 
         return GroundedAnswer(
@@ -259,10 +274,25 @@ Rules:
             is_allowed=is_allowed,
             applicable_authority=authority_name,
             required_approvals=self._bucket(relevant_sentences, ["approval", "permission", "sanction", "permit", "license"]),
-            required_documents=self._bucket(relevant_sentences, ["document", "certificate", "drawing", "form", "affidavit", "ownership"]),
-            relevant_restrictions=self._bucket(relevant_sentences, ["shall not", "prohibited", "restriction", "not permitted", "condition"]),
+            required_documents=self._bucket_with_context(
+                relevant_sentences,
+                ["document", "certificate", "drawing", "form", "affidavit", "ownership"],
+                actual_sources,
+                "required documents",
+            ),
+            relevant_restrictions=self._bucket_with_context(
+                relevant_sentences,
+                ["shall not", "prohibited", "restriction", "not permitted", "condition"],
+                actual_sources,
+                "restriction",
+            ),
             far_height_setback_notes=self._bucket(relevant_sentences, ["far", "fsi", "height", "setback", "coverage", "floor area"]),
-            inspection_requirements=self._bucket(relevant_sentences, ["inspection", "completion", "occupancy certificate", "fire", "structural"]),
+            inspection_requirements=self._bucket_with_context(
+                relevant_sentences,
+                ["inspection", "completion", "occupancy certificate", "fire", "structural"],
+                actual_sources,
+                "inspection",
+            ),
             risks_common_mistakes=[
                 "Do not assume FAR/FSI, setback, height, or floor limits unless they appear in the retrieved authority text.",
                 "Structural load, waterproofing, drainage, and fire-safety review may still be required for roof or floor additions.",
@@ -337,6 +367,41 @@ Rules:
     def _bucket(sentences: list[str], keywords: list[str]) -> list[str]:
         bucket = [sentence for sentence in sentences if any(keyword in sentence.lower() for keyword in keywords)]
         return bucket[:4] if bucket else ["No explicit source-backed item was retrieved for this section."]
+
+    @staticmethod
+    def _bucket_with_context(
+        sentences: list[str],
+        keywords: list[str],
+        sources: list[SourceReference],
+        section_label: str,
+    ) -> list[str]:
+        bucket = [sentence for sentence in sentences if any(keyword in sentence.lower() for keyword in keywords)]
+        if bucket:
+            return bucket[:4]
+        context = GroundedGenerationService._summary_context(sources, sentences)
+        if context:
+            return [f"No explicit {section_label} clause was isolated; retrieved context: {context}"]
+        return ["No explicit source-backed item was retrieved for this section."]
+
+    @staticmethod
+    def _summary_context(sources: list[SourceReference], sentences: list[str]) -> str:
+        if sentences:
+            return excerpt(sentences[0], 320)
+        for source in sources:
+            source_sentences = split_sentences(source.excerpt)
+            if source_sentences:
+                return excerpt(source_sentences[0], 320)
+            if source.excerpt:
+                return excerpt(source.excerpt, 320)
+        return ""
+
+    @staticmethod
+    def _retrieval_zero_reason(sources: list[SourceReference]) -> str | None:
+        for source in sources:
+            reason = source.metadata.get("retrieval_zero_reason")
+            if reason:
+                return str(reason)
+        return None
 
     @staticmethod
     def _bucket_hindi(sentences: list[str], keywords: list[str]) -> list[str]:

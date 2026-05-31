@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import structlog
+
 from app.db.supabase import SupabaseRepository
 from app.models.schemas import AskRequest, AskResponse, Authority, GroundedAnswer, Language
 from app.services.authority import AuthorityCatalog
@@ -9,6 +11,9 @@ from app.services.llm import GroundedGenerationService
 from app.services.query_understanding import QueryUnderstandingService
 from app.services.retrieval import RetrievalService
 from app.services.store import InMemoryStore
+
+
+logger = structlog.get_logger(__name__)
 
 
 class AssistantService:
@@ -50,7 +55,60 @@ class AssistantService:
             await self._save_query(request, response)
             return response
 
+        retrieval_filters = {
+            "authority_id": detected.authority_id,
+            "authority_name": detected.authority_name,
+            "city": detected.city,
+            "state": detected.state,
+            "document_type": None,
+            "project_type": detected.project_type,
+            "construction_category": detected.construction_category,
+        }
+        logger.info("ask_retrieval_before", query=request.query, filters=retrieval_filters)
         sources = await self.retrieval.retrieve_for_ask(request.query, detected)
+        actual_sources = [source for source in sources if not source.metadata.get("seed")]
+        logger.info(
+            "ask_retrieval_after",
+            retrieved_chunks_count=len(actual_sources),
+            returned_source_count=len(sources),
+            document_ids=sorted({source.document_id for source in actual_sources}),
+            authority_metadata=[
+                {
+                    "document_id": source.document_id,
+                    "authority_name": source.authority_name,
+                    "authority_slug": source.metadata.get("authority_slug"),
+                    "city": source.city,
+                    "state": source.state,
+                    "document_type": source.metadata.get("document_type"),
+                    "source_kind": source.metadata.get("source_kind") or source.metadata.get("ingestion_source"),
+                }
+                for source in actual_sources
+            ],
+            similarity_scores=[source.score for source in actual_sources],
+            zero_reason=next(
+                (
+                    source.metadata.get("retrieval_zero_reason")
+                    for source in sources
+                    if source.metadata.get("retrieval_zero_reason")
+                ),
+                None,
+            ),
+            filters=retrieval_filters,
+        )
+        logger.info(
+            "ask_grounding_before",
+            query=request.query,
+            grounded_source_count=len(actual_sources),
+            source_documents=[
+                {
+                    "document_id": source.document_id,
+                    "document_title": source.document_title,
+                    "score": source.score,
+                    "authority_slug": source.metadata.get("authority_slug"),
+                }
+                for source in actual_sources
+            ],
+        )
         answer = await self.generation.generate(request.query, request.language.value, detected, jurisdiction, sources)
         response = AskResponse(
             query_id=str(uuid4()),

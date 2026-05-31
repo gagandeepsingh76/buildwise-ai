@@ -96,6 +96,7 @@ class DocumentService:
                 "authority_slug": metadata.authority_id,
                 "authority_name": authority.name if authority else metadata.authority_id,
                 "ingestion_source": "admin_upload",
+                "source_kind": "uploaded_authority_document",
             },
         }
 
@@ -126,6 +127,8 @@ class DocumentService:
                     "metadata": {
                         "authority_slug": metadata.authority_id,
                         "document_type": metadata.document_type,
+                        "ingestion_source": "admin_upload",
+                        "source_kind": "uploaded_authority_document",
                         "tags": metadata.tags,
                     },
                     "document_title": metadata.title,
